@@ -43,9 +43,14 @@ export function assignPoints(scores: ScoreInput[]): ScoreResult[] {
 
 export function randomizeGroups(players: string[], groupSize: number): string[][] {
   const shuffled = [...players].sort(() => Math.random() - 0.5)
-  const groups: string[][] = []
-  for (let i = 0; i < shuffled.length; i += groupSize) {
-    groups.push(shuffled.slice(i, i + groupSize))
+  const n = shuffled.length
+  const numGroups = Math.ceil(n / groupSize)
+  // All groups except the first are filled to exactly groupSize.
+  // The first group gets whatever is left (≤ groupSize).
+  const firstSize = n - (numGroups - 1) * groupSize
+  const groups: string[][] = [shuffled.slice(0, firstSize)]
+  for (let i = 1; i < numGroups; i++) {
+    groups.push(shuffled.slice(firstSize + (i - 1) * groupSize, firstSize + i * groupSize))
   }
   return groups
 }

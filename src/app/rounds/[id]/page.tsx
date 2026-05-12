@@ -703,7 +703,7 @@ export default function RoundPage() {
 
               {setupPlayerList.length > 0 && setupPlayerList.length % setupGroupSize !== 0 && (
                 <p style={{ fontSize: 12, color: 'var(--ink-faint)', margin: 0 }}>
-                  Note: {setupPlayerList.length} players doesn&apos;t divide evenly into groups of {setupGroupSize} — the last group will be smaller.
+                  Note: {setupPlayerList.length} players doesn&apos;t divide evenly — the first group will have {setupPlayerList.length - (Math.ceil(setupPlayerList.length / setupGroupSize) - 1) * setupGroupSize} players.
                 </p>
               )}
             </div>
