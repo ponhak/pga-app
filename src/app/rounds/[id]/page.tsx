@@ -30,11 +30,14 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number }[]
     const line = raw.trim()
     if (!line) continue
     if (/^hcp\s/i.test(line) || /handicaprond/i.test(line)) continue
-    // Try patterns from most to least specific
-    const m = line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]+?)\s{2,}(\d{2,3})\s+[+\-]/)
-      ?? line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]+?)\s+(\d{2,3})\s+[+\-]/)
-      ?? line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]{4,}?)\s{2,}(\d{2,3})(?:\s|$)/)
-      ?? line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]{4,}?)\s+(\d{2,3})(?:\s|$)/)
+    // Rank prefix: "1 ", "1. ", "1) " — all optional
+    const rankPrefix = /^(?:\d+[\.\)]?\s+)?/
+    const name = /([A-Za-zÅÄÖåäöÉéÜü\s\-]{4,}?)/
+    const score = /(\d{2,3})/
+    const m = line.match(new RegExp(rankPrefix.source + name.source + /\s{2,}/.source + score.source + /\s+[+\-]/.source))
+      ?? line.match(new RegExp(rankPrefix.source + name.source + /\s+/.source + score.source + /\s+[+\-]/.source))
+      ?? line.match(new RegExp(rankPrefix.source + name.source + /\s{2,}/.source + score.source + /(?:\s|$)/.source))
+      ?? line.match(new RegExp(rankPrefix.source + name.source + /\s+/.source + score.source + /(?:\s|$)/.source))
     if (!m) continue
     const strokes = Number(m[2])
     if (strokes < 55 || strokes > 160) continue
