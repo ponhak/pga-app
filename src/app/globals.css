@@ -1,26 +1,204 @@
+@import url('https://fonts.googleapis.com/css2?family=Stardos+Stencil:wght@700&display=swap');
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-dm-sans);
+  --font-mono: var(--font-dm-mono);
+  --font-display: var(--font-oswald);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* ---- PGA Schager brand palette (raw hex, use via var()) ---- */
+  --tour-navy: #0A2240;
+  --tour-navy-deep: #061732;
+  --tour-navy-soft: #1B3A66;
+  --tournament-red: #C8102E;
+  --tournament-red-deep: #A20C24;
+  --fairway-green: #1F7A4C;
+  --fairway-green-deep: #155936;
+  --trophy-gold: #C9A24A;
+  --trophy-gold-soft: #E5C97A;
+  --bunker-sand: #F5EFE0;
+  --bunker-sand-deep: #EAE2CC;
+  --ink: #0A2240;
+  --ink-soft: #4A5A75;
+  --ink-faint: #8895AC;
+
+  /* ---- PGA Schager font families ---- */
+  --font-display: var(--font-oswald, 'Oswald', 'Arial Narrow', sans-serif);
+  --font-body: var(--font-dm-sans, 'DM Sans', system-ui, sans-serif);
+  --font-mono: var(--font-dm-mono, 'DM Mono', ui-monospace, monospace);
+  --font-stencil: 'Stardos Stencil', var(--font-display);
+
+  /* ---- Motion ---- */
+  --ease-tour: cubic-bezier(.2, .7, .2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* ---- Shadows ---- */
+  --shadow-card: 0 1px 2px rgba(10,34,64,.06), 0 4px 12px rgba(10,34,64,.06);
+  --shadow-pop: 0 12px 32px rgba(10,34,64,.18);
+
+  /* ---- Score semantics ---- */
+  --score-under: var(--fairway-green);
+  --score-even: var(--ink);
+  --score-over: var(--ink-soft);
+  --score-eagle: var(--tournament-red);
+  --score-leader: var(--trophy-gold);
+
+  /* ---- Tailwind / shadcn semantic tokens → PGA Schager palette ---- */
+  --background: oklch(0.95 0.017 82);       /* bunker sand #F5EFE0 */
+  --foreground: oklch(0.19 0.068 251);      /* tour navy #0A2240 */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.19 0.068 251);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.19 0.068 251);
+  --primary: oklch(0.19 0.068 251);         /* tour navy */
+  --primary-foreground: oklch(0.95 0.017 82);
+  --secondary: oklch(0.91 0.018 82);        /* bunker sand deep */
+  --secondary-foreground: oklch(0.19 0.068 251);
+  --muted: oklch(0.91 0.018 82);
+  --muted-foreground: oklch(0.43 0.040 251); /* ink-soft */
+  --accent: oklch(0.73 0.108 75);           /* trophy gold #C9A24A */
+  --accent-foreground: oklch(0.19 0.068 251);
+  --destructive: oklch(0.48 0.208 27);      /* tournament red #C8102E */
+  --border: oklch(0.87 0.015 251);          /* light navy-tinted border */
+  --input: oklch(0.91 0.018 82);
+  --ring: oklch(0.19 0.068 251);
+  --radius: 0.75rem;
+  --chart-1: oklch(0.19 0.068 251);
+  --chart-2: oklch(0.73 0.108 75);
+  --chart-3: oklch(0.51 0.109 160);
+  --chart-4: oklch(0.48 0.208 27);
+  --chart-5: oklch(0.43 0.040 251);
+  --sidebar: oklch(0.19 0.068 251);
+  --sidebar-foreground: oklch(0.95 0.017 82);
+  --sidebar-primary: oklch(0.73 0.108 75);
+  --sidebar-primary-foreground: oklch(0.19 0.068 251);
+  --sidebar-accent: oklch(0.25 0.068 251);
+  --sidebar-accent-foreground: oklch(0.95 0.017 82);
+  --sidebar-border: oklch(0.25 0.068 251);
+  --sidebar-ring: oklch(0.73 0.108 75);
+}
+
+/* Broadcast / dark mode */
+.theme-broadcast,
+[data-theme="dark"] {
+  --background: oklch(0.19 0.068 251);      /* tour navy */
+  --foreground: oklch(0.95 0.017 82);       /* bunker sand */
+  --card: oklch(0.14 0.055 251);            /* tour navy deep */
+  --card-foreground: oklch(0.95 0.017 82);
+  --border: rgba(255,255,255,.10);
+  --muted-foreground: oklch(0.65 0.035 251);
+  --score-even: oklch(0.95 0.017 82);
+  --score-over: oklch(0.70 0.035 251);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ---- Typographic utilities ---- */
+.font-display {
+  font-family: var(--font-display);
+}
+.font-stencil {
+  font-family: var(--font-stencil);
+}
+
+/* ---- Score color utilities ---- */
+.score--under { color: var(--score-under); }
+.score--even  { color: var(--score-even); }
+.score--over  { color: var(--score-over); }
+.score--lead  { color: var(--score-leader); }
+.score--eagle { color: var(--score-eagle); }
+
+/* ---- Eyebrow label ---- */
+.eyebrow {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ---- Dimple pattern background ---- */
+.bg-dimple {
+  background-image:
+    radial-gradient(circle at 10px 10px, rgba(255,255,255,.06) 2.2px, transparent 2.5px),
+    radial-gradient(circle at 0 0, rgba(255,255,255,.06) 2.2px, transparent 2.5px);
+  background-size: 20px 20px;
+}
+
+/* ---- Broadcast lower-third header ---- */
+.broadcast-header {
+  background: #000;
+  border-top: 2px solid var(--trophy-gold);
+  color: #B9C5D9;
+  font-size: 10px;
+  letter-spacing: .14em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* ---- PlayerSheet animation ---- */
+@keyframes slideup {
+  from { transform: translateY(28px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

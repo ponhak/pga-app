@@ -1,65 +1,394 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+export const dynamic = 'force-dynamic'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import type { Player, Round, Score } from '@/lib/database.types'
+import { Clock, Users, ChevronRight, Trophy, Flag } from 'lucide-react'
+import { NextRoundCountdown } from '@/components/NextRoundCountdown'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any
+
+interface Standing {
+  player: Player
+  totalPoints: number
+  roundsPlayed: number
+  wins: number
+}
+
+interface RecentRound {
+  round: Round
+  playerCount: number
+  hasScores: boolean
+}
+
+function Avatar({ initials, size = 28, gold = false }: { initials: string; size?: number; gold?: boolean }) {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      background: gold ? 'var(--trophy-gold)' : 'var(--tour-navy)',
+      color: gold ? 'var(--tour-navy)' : '#F5EFE0',
+      fontFamily: 'var(--font-display)', fontWeight: 700,
+      fontSize: size * 0.42, letterSpacing: '.04em',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {initials}
     </div>
-  );
+  )
+}
+
+function initials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+}
+
+function formatPts(n: number) {
+  return n % 1 === 0 ? String(n) : n.toFixed(1)
+}
+
+export default function DashboardPage() {
+  const [standings, setStandings] = useState<Standing[]>([])
+  const [recentRounds, setRecentRounds] = useState<RecentRound[]>([])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => { loadData() }, [])
+
+  async function loadData() {
+    const [{ data: players }, { data: scores }, { data: rounds }, { data: roundPlayers }] =
+      await Promise.all([
+        db.from('players').select('*'),
+        db.from('scores').select('*'),
+        db.from('rounds').select('*').order('date', { ascending: false }).limit(5),
+        db.from('round_players').select('round_id, player_id'),
+      ])
+
+    const typedPlayers = (players as Player[]) ?? []
+    const typedScores = (scores as Score[]) ?? []
+    const typedRounds = (rounds as Round[]) ?? []
+    const typedRP = (roundPlayers as { round_id: string; player_id: string }[]) ?? []
+
+    const standingMap: Record<string, Standing> = {}
+    typedPlayers.forEach((p) => {
+      standingMap[p.id] = { player: p, totalPoints: 0, roundsPlayed: 0, wins: 0 }
+    })
+
+    const scoresByRound: Record<string, Score[]> = {}
+    typedScores.forEach((s) => {
+      if (!scoresByRound[s.round_id]) scoresByRound[s.round_id] = []
+      scoresByRound[s.round_id].push(s)
+    })
+
+    typedScores.forEach((s) => {
+      if (standingMap[s.player_id] && s.points_earned != null) {
+        standingMap[s.player_id].totalPoints += Number(s.points_earned)
+        standingMap[s.player_id].roundsPlayed += 1
+        if (s.rank === 1) standingMap[s.player_id].wins += 1
+      }
+    })
+
+    const sorted = Object.values(standingMap)
+      .sort((a, b) => b.totalPoints - a.totalPoints || a.player.name.localeCompare(b.player.name))
+    setStandings(sorted)
+
+    const rpByRound: Record<string, number> = {}
+    typedRP.forEach((rp) => {
+      rpByRound[rp.round_id] = (rpByRound[rp.round_id] ?? 0) + 1
+    })
+
+    setRecentRounds(typedRounds.map((r) => ({
+      round: r,
+      playerCount: rpByRound[r.id] ?? 0,
+      hasScores: (scoresByRound[r.id] ?? []).some((s) => s.strokes != null),
+    })))
+
+    setLoading(false)
+  }
+
+  const leader = standings[0]
+  const hasData = standings.some(s => s.totalPoints > 0)
+
+  return (
+    <div>
+      {/* ── Hero ── */}
+      <section
+        className="bg-dimple"
+        style={{
+          background: 'var(--tour-navy)',
+          padding: '24px 16px 28px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ position: 'relative' }}>
+          <h1 style={{
+            fontFamily: 'var(--font-display)', fontWeight: 700,
+            fontSize: 52, lineHeight: 0.95, letterSpacing: '-0.01em',
+            textTransform: 'uppercase', margin: '0 0 10px', color: '#fff',
+            paddingLeft: 100,
+          }}>
+            PGA<br/>Schager
+          </h1>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              height: 22, padding: '0 9px', borderRadius: 999,
+              fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase',
+              background: 'var(--tournament-red)', color: '#fff',
+            }}>
+              <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />
+              Season Live
+            </span>
+            <span style={{ fontSize: 11, letterSpacing: '.12em', color: '#B9C5D9', fontWeight: 700, textTransform: 'uppercase' }}>
+              {new Date().getFullYear()}
+            </span>
+          </div>
+
+          {leader && hasData && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(201,162,74,.15)', border: '1px solid rgba(201,162,74,.30)', borderRadius: 8 }}>
+                <Trophy size={16} color="var(--trophy-gold)" strokeWidth={2} />
+                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0' }}>
+                  {leader.player.name}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 15, color: 'var(--trophy-gold)', marginLeft: 'auto' }}>
+                  {formatPts(leader.totalPoints)} pts
+                </span>
+              </div>
+              <a
+                href="#leaderboard"
+                style={{
+                  display: 'block', marginTop: 8, textAlign: 'right',
+                  fontSize: 12, fontWeight: 600, color: 'rgba(245,239,224,.55)',
+                  letterSpacing: '.04em', textDecoration: 'none',
+                }}
+              >
+                Full leaderboard ↓
+              </a>
+            </>
+          )}
+
+        </div>
+      </section>
+
+      {/* ── Next round countdown ── */}
+      <NextRoundCountdown playerCount={standings.length} />
+
+      {/* ── Info strip ── */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
+        borderTop: '1px solid var(--bunker-sand-deep)',
+        borderBottom: '1px solid var(--bunker-sand-deep)',
+        background: '#fff',
+      }}>
+        {[
+          { lbl: 'Format', val: 'Stroke play' },
+          { lbl: 'Field',  val: `${standings.length} players` },
+          { lbl: 'Rounds', val: `${recentRounds.length} played` },
+        ].map((it, i) => (
+          <div key={i} style={{
+            padding: '12px 8px', textAlign: 'center',
+            borderRight: i < 2 ? '1px solid var(--bunker-sand-deep)' : 'none',
+          }}>
+            <div style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--ink-faint)', fontWeight: 700, textTransform: 'uppercase' }}>{it.lbl}</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 600, color: 'var(--ink)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '.02em' }}>{it.val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Leaderboard (broadcast style) ── */}
+      <section id="leaderboard" style={{ background: 'var(--tour-navy)', marginTop: 0 }}>
+        {/* Sub-header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 14px',
+          background: 'var(--tour-navy-deep)',
+          borderBottom: '1px solid rgba(255,255,255,.06)',
+        }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0' }}>
+            Leaderboard
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 22, padding: '0 9px', borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', background: 'var(--tournament-red)', color: '#fff' }}>
+            <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />
+            Live
+          </span>
+        </div>
+
+        {/* Column header */}
+        <div className="broadcast-header" style={{
+          display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px',
+          alignItems: 'center', height: 30, padding: '0 14px',
+        }}>
+          <span>POS</span>
+          <span>PLAYER</span>
+          <span style={{ textAlign: 'right' }}>ROUNDS</span>
+          <span style={{ textAlign: 'right' }}>POINTS</span>
+        </div>
+
+        {/* Rows */}
+        {loading ? (
+          <div style={{ padding: '24px 14px', color: '#8895AC', fontSize: 13, textAlign: 'center' }}>Loading…</div>
+        ) : standings.length === 0 ? (
+          <div style={{ padding: '32px 16px', textAlign: 'center', color: '#8895AC', fontSize: 14 }}>
+            No players yet.{' '}
+            <Link href="/players" style={{ color: 'var(--trophy-gold)', fontWeight: 700, textDecoration: 'none' }}>Add players</Link>
+            {' '}to get started.
+          </div>
+        ) : (
+          <div>
+            {standings.map((s, i) => {
+              const isLeader = i === 0 && hasData
+              const rowBg = isLeader ? 'rgba(201,162,74,.15)' : 'transparent'
+              return (
+                <div
+                  key={s.player.id}
+                  style={{
+                    display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px',
+                    alignItems: 'center', height: 52, padding: '0 14px',
+                    background: rowBg, color: '#F5EFE0',
+                    borderBottom: '1px solid rgba(255,255,255,.06)',
+                  }}
+                >
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500,
+                    color: isLeader ? 'var(--trophy-gold)' : '#B9C5D9',
+                  }}>
+                    {i + 1}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <Avatar initials={initials(s.player.name)} size={28} gold={isLeader} />
+                    <span style={{ fontWeight: 500, fontSize: 15, color: '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {s.player.name}
+                    </span>
+                    {s.wins > 0 && (
+                      <span style={{
+                        flexShrink: 0, height: 18, padding: '0 6px', borderRadius: 999,
+                        fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
+                        background: 'rgba(201,162,74,.25)', color: 'var(--trophy-gold)',
+                        display: 'flex', alignItems: 'center',
+                      }}>
+                        {s.wins}W
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#B9C5D9', textAlign: 'right' }}>
+                    {s.roundsPlayed}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 18,
+                    textAlign: 'right',
+                    color: isLeader ? 'var(--trophy-gold)' : (s.totalPoints > 0 ? '#F5EFE0' : '#8895AC'),
+                  }}>
+                    {formatPts(s.totalPoints)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div style={{ padding: '14px', fontSize: 11, color: '#8895AC', letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600, textAlign: 'center' }}>
+          Points: 1st = N pts · Last = 1 pt · Ties averaged
+        </div>
+      </section>
+
+      {/* ── Quick links ── */}
+      <section style={{ padding: '20px 16px 8px', background: 'var(--bunker-sand)' }}>
+        <div className="eyebrow" style={{ marginBottom: 12 }}>Quick access</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
+          {[
+            { href: '/rounds/new', label: 'New Round', sub: 'Set up groups + scores', Icon: Clock },
+            { href: '/players',    label: 'The Field',  sub: 'Manage player roster',  Icon: Users },
+          ].map(({ href, label, sub, Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              style={{
+                background: '#fff',
+                border: '1px solid var(--bunker-sand-deep)',
+                borderRadius: 12, padding: '14px 12px',
+                boxShadow: 'var(--shadow-card)',
+                textDecoration: 'none',
+                display: 'flex', flexDirection: 'column', gap: 6,
+              }}
+            >
+              <Icon size={22} color="var(--tour-navy)" strokeWidth={2} />
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, textTransform: 'uppercase', letterSpacing: '.02em', color: 'var(--ink)' }}>{label}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{sub}</div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Recent rounds ── */}
+      {recentRounds.length > 0 && (
+        <section style={{ padding: '20px 16px 24px', background: 'var(--bunker-sand)' }}>
+          <div className="eyebrow" style={{ marginBottom: 12 }}>Recent rounds</div>
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid var(--bunker-sand-deep)',
+              borderRadius: 12,
+              boxShadow: 'var(--shadow-card)',
+              overflow: 'hidden',
+            }}
+          >
+            {recentRounds.map(({ round, playerCount, hasScores }, i) => (
+              <Link
+                key={round.id}
+                href={`/rounds/${round.id}`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '14px 16px',
+                  borderBottom: i < recentRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
+                  textDecoration: 'none',
+                }}
+              >
+                <div style={{
+                  width: 44, height: 44, background: 'var(--tour-navy)', borderRadius: 8,
+                  color: '#F5EFE0', display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <div style={{ fontSize: 9, letterSpacing: '.10em', fontWeight: 700 }}>
+                    {new Date(round.date + 'T12:00:00').toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, lineHeight: 1 }}>
+                    {new Date(round.date + 'T12:00:00').getDate()}
+                  </div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, textTransform: 'uppercase', color: 'var(--ink)', letterSpacing: '.02em' }}>
+                    {new Date(round.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' })}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>
+                    {playerCount} player{playerCount !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                {hasScores ? (
+                  <span style={{
+                    height: 22, padding: '0 9px', borderRadius: 999,
+                    fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase',
+                    background: 'rgba(31,122,76,.14)', color: 'var(--fairway-green)',
+                    display: 'flex', alignItems: 'center',
+                  }}>Scored</span>
+                ) : (
+                  <span style={{
+                    height: 22, padding: '0 9px', borderRadius: 999,
+                    fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase',
+                    background: 'rgba(10,34,64,.08)', color: 'var(--ink-soft)',
+                    display: 'flex', alignItems: 'center',
+                  }}>Pending</span>
+                )}
+                <ChevronRight size={16} color="var(--ink-faint)" strokeWidth={2} />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
 }
