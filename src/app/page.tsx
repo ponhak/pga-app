@@ -167,28 +167,6 @@ export default function DashboardPage() {
       {/* ── Next round countdown ── */}
       <NextRoundCountdown playerCount={standings.length} />
 
-      {/* ── Info strip ── */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
-        borderTop: '1px solid var(--bunker-sand-deep)',
-        borderBottom: '1px solid var(--bunker-sand-deep)',
-        background: '#fff',
-      }}>
-        {[
-          { lbl: 'Format', val: 'Stroke play' },
-          { lbl: 'Field',  val: `${standings.length} players` },
-          { lbl: 'Rounds', val: `${recentRounds.length} played` },
-        ].map((it, i) => (
-          <div key={i} style={{
-            padding: '12px 8px', textAlign: 'center',
-            borderRight: i < 2 ? '1px solid var(--bunker-sand-deep)' : 'none',
-          }}>
-            <div style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--ink-faint)', fontWeight: 700, textTransform: 'uppercase' }}>{it.lbl}</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 600, color: 'var(--ink)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '.02em' }}>{it.val}</div>
-          </div>
-        ))}
-      </div>
-
       {/* ── Leaderboard (broadcast style) ── */}
       <section id="leaderboard" style={{ background: 'var(--tour-navy)', marginTop: 0 }}>
         {/* Sub-header */}
