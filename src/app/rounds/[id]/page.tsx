@@ -268,7 +268,11 @@ export default function RoundPage() {
   async function saveScores() {
     const entries = Object.entries(scores)
       .filter(([, v]) => v !== '' && !isNaN(Number(v)))
-      .map(([playerId, v]) => ({ playerId, strokes: Number(v) }))
+      .map(([playerId, v]) => {
+        const net = Number(v)
+        const hcp = hcpData[playerId] ?? null
+        return { playerId, strokes: net, grossStrokes: hcp != null ? net + hcp : undefined }
+      })
 
     if (entries.length === 0) { toast.error('Enter at least one score'); return }
 
