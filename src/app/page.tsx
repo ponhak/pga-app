@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Player, Round, Score } from '@/lib/database.types'
-import { Clock, Users, ChevronRight, Trophy, Flag } from 'lucide-react'
+import { ChevronRight, Trophy } from 'lucide-react'
 import { NextRoundCountdown } from '@/components/NextRoundCountdown'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -282,34 +282,6 @@ export default function DashboardPage() {
 
         <div style={{ padding: '14px', fontSize: 11, color: '#8895AC', letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600, textAlign: 'center' }}>
           Points: 1st = N pts · Last = 1 pt · Ties averaged
-        </div>
-      </section>
-
-      {/* ── Quick links ── */}
-      <section style={{ padding: '20px 16px 8px', background: 'var(--bunker-sand)' }}>
-        <div className="eyebrow" style={{ marginBottom: 12 }}>Quick access</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
-          {[
-            { href: '/rounds/new', label: 'New Round', sub: 'Set up groups + scores', Icon: Clock },
-            { href: '/players',    label: 'The Field',  sub: 'Manage player roster',  Icon: Users },
-          ].map(({ href, label, sub, Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              style={{
-                background: '#fff',
-                border: '1px solid var(--bunker-sand-deep)',
-                borderRadius: 12, padding: '14px 12px',
-                boxShadow: 'var(--shadow-card)',
-                textDecoration: 'none',
-                display: 'flex', flexDirection: 'column', gap: 6,
-              }}
-            >
-              <Icon size={22} color="var(--tour-navy)" strokeWidth={2} />
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, textTransform: 'uppercase', letterSpacing: '.02em', color: 'var(--ink)' }}>{label}</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{sub}</div>
-            </Link>
-          ))}
         </div>
       </section>
 
