@@ -2,65 +2,29 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import { ShieldCheck, Users, Database, CalendarDays, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
-import { toast } from 'sonner'
-import { X, Plus, ShieldCheck } from 'lucide-react'
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any
 
 const ADMIN_EMAIL = 'ponhak@gmail.com'
 
-interface AllowedEmail {
-  email: string
-  added_at: string
+interface AdminCard {
+  href: string
+  Icon: React.ElementType
+  label: string
+  desc: string
 }
 
-export default function AdminPage() {
+const CARDS: AdminCard[] = [
+  { href: '/admin/members',  Icon: ShieldCheck,  label: 'Approved Members',    desc: 'Control who can sign up and access the app' },
+  { href: '/players',        Icon: Users,         label: 'Field',               desc: 'Add or remove players from the roster' },
+  { href: '/admin/data',     Icon: Database,      label: 'Manage Data',         desc: 'Add historical rounds and correct results' },
+  { href: '/admin/planning', Icon: CalendarDays,  label: 'Seasonal Planning',   desc: 'Plan and configure the upcoming season' },
+]
+
+export default function AdminHubPage() {
   const { session, loading } = useAuth()
-  const [emails, setEmails]   = useState<AllowedEmail[]>([])
-  const [newEmail, setNewEmail] = useState('')
-  const [saving, setSaving]   = useState(false)
-
-  const isAdmin = session?.user.email === ADMIN_EMAIL
-
-  useEffect(() => {
-    if (isAdmin) loadEmails()
-  }, [isAdmin])
-
-  async function loadEmails() {
-    const { data } = await db.from('allowed_emails').select('email, added_at').order('added_at')
-    setEmails(data ?? [])
-  }
-
-  async function addEmail(e: React.FormEvent) {
-    e.preventDefault()
-    const val = newEmail.toLowerCase().trim()
-    if (!val) return
-    setSaving(true)
-    const { error } = await db.from('allowed_emails').insert({ email: val })
-    if (error) {
-      toast.error(error.message)
-    } else {
-      toast.success(`${val} added to allowlist`)
-      setNewEmail('')
-      await loadEmails()
-    }
-    setSaving(false)
-  }
-
-  async function removeEmail(email: string) {
-    if (!confirm(`Remove ${email} from the allowlist?`)) return
-    const { error } = await db.from('allowed_emails').delete().eq('email', email)
-    if (error) {
-      toast.error(error.message)
-    } else {
-      toast.success(`${email} removed`)
-      await loadEmails()
-    }
-  }
+  const router = useRouter()
 
   if (loading) return null
 
@@ -73,7 +37,7 @@ export default function AdminPage() {
     )
   }
 
-  if (!isAdmin) {
+  if (session.user.email !== ADMIN_EMAIL) {
     return (
       <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--ink-soft)' }}>
         <ShieldCheck size={40} strokeWidth={1.5} style={{ margin: '0 auto 12px', color: 'var(--ink-faint)' }} />
@@ -91,46 +55,15 @@ export default function AdminPage() {
         borderBottom: '2px solid var(--trophy-gold)',
       }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--trophy-gold)', marginBottom: 4 }}>
-          Admin
+          Admin Panel
         </div>
         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 28, textTransform: 'uppercase', letterSpacing: '.02em', color: '#fff', lineHeight: 1 }}>
-          Approved Members
+          Management
         </div>
       </div>
 
-      {/* Add form */}
-      <form onSubmit={addEmail} style={{ padding: '16px', display: 'flex', gap: 10 }}>
-        <input
-          type="email"
-          value={newEmail}
-          onChange={e => setNewEmail(e.target.value)}
-          placeholder="new@email.com"
-          style={{
-            flex: 1, height: 44, padding: '0 14px',
-            borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)',
-            background: '#fff', color: 'var(--ink)',
-            fontFamily: 'var(--font-body)', fontSize: 15, outline: 'none',
-            boxSizing: 'border-box',
-          }}
-        />
-        <button
-          type="submit"
-          disabled={saving || !newEmail.trim()}
-          style={{
-            height: 44, padding: '0 16px', borderRadius: 8, border: 0,
-            background: saving || !newEmail.trim() ? '#ccc' : 'var(--tour-navy)',
-            color: '#F5EFE0', cursor: saving || !newEmail.trim() ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', gap: 6,
-            fontWeight: 700, fontSize: 14, letterSpacing: '.04em', textTransform: 'uppercase',
-          }}
-        >
-          <Plus size={16} strokeWidth={2.5} />
-          Add
-        </button>
-      </form>
-
-      {/* Email list */}
-      <div style={{ padding: '0 16px 32px' }}>
+      {/* Cards */}
+      <div style={{ padding: '20px 16px 32px' }}>
         <div style={{
           background: '#fff',
           border: '1px solid var(--bunker-sand-deep)',
@@ -138,42 +71,37 @@ export default function AdminPage() {
           boxShadow: 'var(--shadow-card)',
           overflow: 'hidden',
         }}>
-          {emails.length === 0 ? (
-            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--ink-faint)', fontSize: 14 }}>
-              No approved emails yet.
-            </div>
-          ) : (
-            emails.map((e, i) => (
-              <div key={e.email} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '14px 16px',
-                borderBottom: i < emails.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
+          {CARDS.map(({ href, Icon, label, desc }, i) => (
+            <button
+              key={href}
+              onClick={() => router.push(href)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                padding: '16px',
+                background: 'transparent',
+                border: 0,
+                borderBottom: i < CARDS.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{
+                width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                background: 'var(--tour-navy)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)' }}>{e.email}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 2 }}>
-                    Added {new Date(e.added_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </div>
-                </div>
-                <button
-                  onClick={() => removeEmail(e.email)}
-                  disabled={e.email === ADMIN_EMAIL}
-                  style={{
-                    width: 32, height: 32, borderRadius: 6, flexShrink: 0,
-                    background: 'transparent',
-                    border: '1px solid var(--bunker-sand-deep)',
-                    color: e.email === ADMIN_EMAIL ? 'var(--ink-faint)' : 'var(--tournament-red)',
-                    cursor: e.email === ADMIN_EMAIL ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    opacity: e.email === ADMIN_EMAIL ? 0.4 : 1,
-                  }}
-                  aria-label={`Remove ${e.email}`}
-                >
-                  <X size={14} strokeWidth={2} />
-                </button>
+                <Icon size={20} strokeWidth={1.8} color="#F5EFE0" />
               </div>
-            ))
-          )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{label}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>{desc}</div>
+              </div>
+              <ChevronRight size={16} color="var(--ink-faint)" strokeWidth={2} />
+            </button>
+          ))}
         </div>
       </div>
     </div>

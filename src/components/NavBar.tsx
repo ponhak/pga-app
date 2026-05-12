@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { UserCircle, LogIn, LogOut, ShieldCheck, Users } from 'lucide-react'
+import { UserCircle, LogIn, LogOut, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 
@@ -183,13 +183,6 @@ export function NavBar() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{firstName}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 2, wordBreak: 'break-all' }}>{session.user.email}</div>
                 </div>
-                <button
-                  onClick={() => { setMenuOpen(false); router.push('/players') }}
-                  style={menuItem()}
-                >
-                  <Users size={15} strokeWidth={2} />
-                  Field
-                </button>
                 {session.user.email === ADMIN_EMAIL && (
                   <button
                     onClick={() => { setMenuOpen(false); router.push('/admin') }}
