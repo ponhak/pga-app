@@ -30,7 +30,8 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
 
   const skipRe = /slagspel|poangbogey|resultat|spelat|leaderboard|spelinfo|spelflode|johannesberg|donald|steel|\bbook\b|\bgame\b/i
   // Captures: [1] optional inline HCP digits, [2] net score (2-3 digits), [3] net +/- vs par
-  const scoreRe = /(?:HCP\s*(\d+)\s+)?(\d{2,3})\s+([+\-]\d+)/i
+  // Sign is optional on [3]: OCR sometimes drops the leading minus (e.g. "-1" becomes "1")
+  const scoreRe = /(?:HCP\s*(\d+)\s+)?(\d{2,3})\s+([+\-]?\d+)/i
   // Standalone HCP line (e.g. "HCP 8" or "HCP8") — captures the value instead of discarding it
   const standaloneHcpRe = /^HCP\s*(\d+)$/i
   const nameOnlyRe = /^[A-Za-zÅÄÖåäöÉéÜü\s\-]{3,}$/
