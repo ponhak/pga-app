@@ -745,7 +745,7 @@ export default function RoundPage() {
 
           {/* Column header */}
           <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 52px 60px 52px',
+            display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px',
             padding: '5px 14px',
             background: 'var(--bunker-sand)',
             borderBottom: '1px solid var(--bunker-sand-deep)',
@@ -754,7 +754,7 @@ export default function RoundPage() {
               <span key={label} style={{
                 fontSize: 9, fontWeight: 700, letterSpacing: '.12em',
                 textTransform: 'uppercase', color: 'var(--ink-soft)',
-                textAlign: i === 0 ? 'left' : i === 2 ? 'center' : 'right',
+                textAlign: i === 0 ? 'left' : 'center',
               }}>{label}</span>
             ))}
           </div>
@@ -773,7 +773,7 @@ export default function RoundPage() {
               <div
                 key={p.id}
                 style={{
-                  display: 'grid', gridTemplateColumns: '1fr 52px 60px 52px',
+                  display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px',
                   alignItems: 'center',
                   padding: '9px 14px',
                   borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
@@ -783,7 +783,7 @@ export default function RoundPage() {
                   <Avatar initials={getInitials(p.name)} size={28} />
                   <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
                 </div>
-                <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 15, color: gross != null ? 'var(--ink-soft)' : 'var(--ink-faint)' }}>
+                <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 15, color: gross != null ? 'var(--ink-soft)' : 'var(--ink-faint)' }}>
                   {gross ?? '—'}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -807,7 +807,7 @@ export default function RoundPage() {
                   />
                 </div>
                 <div style={{
-                  textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+                  textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
                   color: diffColor,
                 }}>
                   {netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—'}
