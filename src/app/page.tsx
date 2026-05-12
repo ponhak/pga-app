@@ -118,60 +118,50 @@ export default function DashboardPage() {
         className="bg-dimple"
         style={{
           background: 'var(--tour-navy)',
-          padding: '24px 16px 28px',
+          padding: '68px 16px 28px',
           position: 'relative',
-          overflow: 'hidden',
         }}
       >
-        <div style={{ position: 'relative' }}>
-          <h1 style={{
-            fontFamily: 'var(--font-display)', fontWeight: 700,
-            fontSize: 52, lineHeight: 0.95, letterSpacing: '-0.01em',
-            textTransform: 'uppercase', margin: '0 0 10px', color: '#fff',
-            paddingLeft: 100,
-          }}>
-            PGA<br/>Schager
-          </h1>
+        <div style={{ position: 'sticky', top: 62, zIndex: 5 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                height: 28, padding: '0 12px', borderRadius: 999,
+                fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase',
+                background: 'var(--tournament-red)', color: '#fff',
+              }}>
+                <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />
+                Season Live
+              </span>
+              <span style={{ fontSize: 11, letterSpacing: '.12em', color: '#B9C5D9', fontWeight: 700, textTransform: 'uppercase' }}>
+                {new Date().getFullYear()}
+              </span>
+            </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              height: 22, padding: '0 9px', borderRadius: 999,
-              fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase',
-              background: 'var(--tournament-red)', color: '#fff',
-            }}>
-              <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />
-              Season Live
-            </span>
-            <span style={{ fontSize: 11, letterSpacing: '.12em', color: '#B9C5D9', fontWeight: 700, textTransform: 'uppercase' }}>
-              {new Date().getFullYear()}
-            </span>
+            {leader && hasData && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(201,162,74,.15)', border: '1px solid rgba(201,162,74,.30)', borderRadius: 8 }}>
+                  <Trophy size={16} color="var(--trophy-gold)" strokeWidth={2} />
+                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0' }}>
+                    {leader.player.name}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 15, color: 'var(--trophy-gold)', marginLeft: 'auto' }}>
+                    {formatPts(leader.totalPoints)} pts
+                  </span>
+                </div>
+                <a
+                  href="#leaderboard"
+                  style={{
+                    display: 'block', marginTop: 8, textAlign: 'right',
+                    fontSize: 12, fontWeight: 600, color: 'rgba(245,239,224,.55)',
+                    letterSpacing: '.04em', textDecoration: 'none',
+                  }}
+                >
+                  Full leaderboard ↓
+                </a>
+              </>
+            )}
           </div>
-
-          {leader && hasData && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(201,162,74,.15)', border: '1px solid rgba(201,162,74,.30)', borderRadius: 8 }}>
-                <Trophy size={16} color="var(--trophy-gold)" strokeWidth={2} />
-                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0' }}>
-                  {leader.player.name}
-                </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 15, color: 'var(--trophy-gold)', marginLeft: 'auto' }}>
-                  {formatPts(leader.totalPoints)} pts
-                </span>
-              </div>
-              <a
-                href="#leaderboard"
-                style={{
-                  display: 'block', marginTop: 8, textAlign: 'right',
-                  fontSize: 12, fontWeight: 600, color: 'rgba(245,239,224,.55)',
-                  letterSpacing: '.04em', textDecoration: 'none',
-                }}
-              >
-                Full leaderboard ↓
-              </a>
-            </>
-          )}
-
         </div>
       </section>
 
