@@ -43,6 +43,7 @@ export default function SchedulePage() {
   const [saving, setSaving]     = useState(false)
 
   const [formDate,      setFormDate]      = useState('')
+  const [formTeeTime,   setFormTeeTime]   = useState('')
   const [formVenue,     setFormVenue]     = useState('')
   const [formGroupSize, setFormGroupSize] = useState('3')
 
@@ -96,10 +97,12 @@ export default function SchedulePage() {
     setSaving(true)
     await db.from('rounds').insert({
       date: formDate,
+      tee_time: formTeeTime || null,
       group_size: Number(formGroupSize),
       notes: formVenue.trim() || null,
     })
     setFormDate('')
+    setFormTeeTime('')
     setFormVenue('')
     setFormGroupSize('3')
     setShowForm(false)
@@ -183,6 +186,41 @@ export default function SchedulePage() {
             </div>
             <div>
               <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#B9C5D9', display: 'block', marginBottom: 4 }}>
+                First tee <span style={{ color: '#8895AC', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+              </label>
+              <input
+                type="time"
+                value={formTeeTime}
+                onChange={e => setFormTeeTime(e.target.value)}
+                style={{
+                  width: '100%', height: 40, padding: '0 10px',
+                  background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.16)',
+                  borderRadius: 6, color: '#fff', fontSize: 14, boxSizing: 'border-box',
+                  colorScheme: 'dark',
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#B9C5D9', display: 'block', marginBottom: 4 }}>
+                Venue <span style={{ color: '#8895AC', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Strand GK"
+                value={formVenue}
+                onChange={e => setFormVenue(e.target.value)}
+                style={{
+                  width: '100%', height: 40, padding: '0 10px',
+                  background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.16)',
+                  borderRadius: 6, color: '#fff', fontSize: 14, boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#B9C5D9', display: 'block', marginBottom: 4 }}>
                 Group size
               </label>
               <select
@@ -197,23 +235,6 @@ export default function SchedulePage() {
                 {[2,3,4].map(n => <option key={n} value={n}>{n}-ball</option>)}
               </select>
             </div>
-          </div>
-
-          <div>
-            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#B9C5D9', display: 'block', marginBottom: 4 }}>
-              Venue <span style={{ color: '#8895AC', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Sandstone Ridge GC · Bend, Oregon"
-              value={formVenue}
-              onChange={e => setFormVenue(e.target.value)}
-              style={{
-                width: '100%', height: 40, padding: '0 10px',
-                background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.16)',
-                borderRadius: 6, color: '#fff', fontSize: 14, boxSizing: 'border-box',
-              }}
-            />
           </div>
 
           <button

@@ -13,6 +13,7 @@ interface NextRound {
   date: string
   group_size: number
   notes: string | null
+  tee_time: string | null
 }
 
 interface TimeLeft {
@@ -26,9 +27,10 @@ function pad(n: number) {
   return String(n).padStart(2, '0')
 }
 
-function getTimeLeft(targetDate: string): TimeLeft {
+function getTimeLeft(date: string, teeTime: string | null): TimeLeft {
   const now = Date.now()
-  const target = new Date(targetDate + 'T08:00:00').getTime()
+  const timeStr = teeTime ?? '08:00'
+  const target = new Date(`${date}T${timeStr}:00`).getTime()
   const diff = Math.max(0, target - now)
   const totalSec = Math.floor(diff / 1000)
   return {
@@ -47,15 +49,26 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
   useEffect(() => {
     async function load() {
       const today = new Date().toISOString().slice(0, 10)
-      const { data } = await db
+
+      // Fetch upcoming unscored rounds (soonest first)
+      const { data: upcoming } = await db
         .from('rounds')
-        .select('id, date, group_size, notes')
+        .select('id, date, group_size, notes, tee_time')
         .gte('date', today)
         .order('date', { ascending: true })
-        .limit(1)
-      const next: NextRound | null = data?.[0] ?? null
+        .limit(10)
+
+      // Find rounds that already have scores
+      const { data: scored } = await db
+        .from('scores')
+        .select('round_id')
+        .not('strokes', 'is', null)
+
+      const scoredSet = new Set((scored ?? []).map((s: { round_id: string }) => s.round_id))
+      const next: NextRound | null = (upcoming ?? []).find((r: NextRound) => !scoredSet.has(r.id)) ?? null
+
       setRound(next)
-      if (next) setTimeLeft(getTimeLeft(next.date))
+      if (next) setTimeLeft(getTimeLeft(next.date, next.tee_time))
       setLoaded(true)
     }
     load()
@@ -63,13 +76,16 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
 
   useEffect(() => {
     if (!round) return
-    const id = setInterval(() => setTimeLeft(getTimeLeft(round.date)), 1000)
+    const id = setInterval(() => setTimeLeft(getTimeLeft(round.date, round.tee_time)), 1000)
     return () => clearInterval(id)
   }, [round])
 
   if (!loaded || !round || !timeLeft) return null
 
   const venue = round.notes?.trim() || 'TBD'
+  const teeLabel = round.tee_time
+    ? new Date(`1970-01-01T${round.tee_time}:00`).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    : null
   const dateLabel = new Date(round.date + 'T12:00:00').toLocaleDateString('en-GB', {
     weekday: 'short', day: 'numeric', month: 'short',
   })
@@ -93,7 +109,7 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
         fontSize: 10, fontWeight: 700, letterSpacing: '.18em',
         textTransform: 'uppercase', color: 'var(--trophy-gold)',
       }}>
-        First Tee
+        First Tee{teeLabel ? ` · ${teeLabel}` : ''}
       </div>
 
       {/* Countdown */}
@@ -139,7 +155,7 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
       {/* CTA buttons */}
       <div style={{ display: 'flex', gap: 10, padding: '0 14px 14px' }}>
         <Link
-          href="/rounds/new"
+          href={`/rounds/${round.id}`}
           style={{
             flex: 1, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'var(--tournament-red)', color: '#fff',
@@ -147,10 +163,10 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
             textTransform: 'uppercase', textDecoration: 'none',
           }}
         >
-          Register
+          Set Up Round
         </Link>
         <Link
-          href={`/rounds/${round.id}`}
+          href="/"
           style={{
             flex: 1, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'transparent', color: '#F5EFE0',

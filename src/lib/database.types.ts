@@ -17,9 +17,9 @@ export interface Database {
         Update: { id?: string; name?: string; created_at?: string }
       }
       rounds: {
-        Row: { id: string; date: string; group_size: number; notes: string | null; created_at: string }
-        Insert: { id?: string; date?: string; group_size: number; notes?: string | null; created_at?: string }
-        Update: { id?: string; date?: string; group_size?: number; notes?: string | null; created_at?: string }
+        Row: { id: string; date: string; group_size: number; notes: string | null; tee_time: string | null; created_at: string }
+        Insert: { id?: string; date?: string; group_size: number; notes?: string | null; tee_time?: string | null; created_at?: string }
+        Update: { id?: string; date?: string; group_size?: number; notes?: string | null; tee_time?: string | null; created_at?: string }
       }
       round_players: {
         Row: { round_id: string; player_id: string }
