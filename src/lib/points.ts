@@ -9,8 +9,8 @@ export interface ScoreResult extends ScoreInput {
   points: number
 }
 
-export function assignPoints(scores: ScoreInput[], multiplier = 1): ScoreResult[] {
-  const n = scores.length
+export function assignPoints(scores: ScoreInput[], multiplier = 1, totalField?: number): ScoreResult[] {
+  const n = totalField ?? scores.length
   const sorted = [...scores].sort((a, b) => {
     if (a.strokes !== b.strokes) return a.strokes - b.strokes
     // Tiebreak by gross when available (lower gross wins)

@@ -352,23 +352,43 @@ export default function RoundPage() {
 
     if (entries.length === 0) { toast.error('Enter at least one score'); return }
 
-    if (entries.length < players.length) {
-      const missingCount = players.length - entries.length
-      if (!confirm(`${missingCount} player(s) have no score. Save anyway?`)) return
-    }
+    const entryIds = new Set(entries.map(e => e.playerId))
+    const dnfPlayers = [...players.filter(p => !entryIds.has(p.id))].sort(() => Math.random() - 0.5)
+
+    const totalField = players.length
+    const multiplier = round?.double_points ? 2 : 1
 
     setSaving(true)
     try {
-      const results = assignPoints(entries, round?.double_points ? 2 : 1)
-      const upserts = results.map(r => ({
-        round_id: id,
-        player_id: r.playerId,
-        strokes: r.strokes,
-        gross_strokes: r.grossStrokes ?? null,
-        net_diff: netDiffData[r.playerId] ?? null,
-        points_earned: r.points,
-        rank: r.rank,
-      }))
+      const results = assignPoints(entries, multiplier, totalField)
+      const maxRank = results.length > 0 ? Math.max(...results.map(r => r.rank)) : 0
+
+      const upserts = [
+        ...results.map(r => ({
+          round_id: id,
+          player_id: r.playerId,
+          strokes: r.strokes,
+          gross_strokes: r.grossStrokes ?? null,
+          net_diff: netDiffData[r.playerId] ?? null,
+          points_earned: r.points,
+          rank: r.rank,
+          dnf: false,
+        })),
+        ...dnfPlayers.map((p, i) => {
+          const rank = maxRank + i + 1
+          const points = (totalField - rank + 1) * multiplier
+          return {
+            round_id: id,
+            player_id: p.id,
+            strokes: null,
+            gross_strokes: null,
+            net_diff: null,
+            points_earned: points,
+            rank,
+            dnf: true,
+          }
+        }),
+      ]
 
       const { error } = await db.from('scores').upsert(upserts, { onConflict: 'round_id,player_id' })
       if (error) throw error
@@ -783,7 +803,7 @@ export default function RoundPage() {
 
   // ── Score entry view ─────────────────────────────────────────────────────
 
-  const isScored = savedScores.some(s => s.strokes != null)
+  const isScored = savedScores.some(s => s.rank != null)
   const sortedScores = [...savedScores].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
 
   return (
@@ -914,22 +934,25 @@ export default function RoundPage() {
               {sortedScores.map((s, i) => {
                 const player = players.find(p => p.id === s.player_id)
                 const isFirst = s.rank === 1
+                const isDnf = s.dnf === true
                 const gross = s.gross_strokes
                 const netDiff = s.net_diff
                 const diffColor = netDiff == null ? 'var(--ink-faint)' : netDiff < 0 ? 'var(--fairway-green)' : netDiff > 0 ? 'var(--tournament-red)' : 'var(--ink-soft)'
                 return (
-                  <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '30px 1fr 52px 48px 52px 54px', alignItems: 'center', padding: '10px 14px', background: isFirst ? 'rgba(201,162,74,.08)' : 'transparent', borderBottom: i < sortedScores.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: isFirst ? 'var(--trophy-gold)' : 'var(--ink-soft)' }}>{s.rank}</span>
+                  <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '30px 1fr 52px 48px 52px 54px', alignItems: 'center', padding: '10px 14px', background: isFirst ? 'rgba(201,162,74,.08)' : isDnf ? 'rgba(200,16,46,.04)' : 'transparent', borderBottom: i < sortedScores.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', opacity: isDnf ? 0.7 : 1 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: isDnf ? 9 : 13, fontWeight: 700, color: isFirst ? 'var(--trophy-gold)' : isDnf ? 'var(--tournament-red)' : 'var(--ink-soft)', letterSpacing: isDnf ? '.04em' : 0 }}>
+                      {isDnf ? 'DNF' : s.rank}
+                    </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                       <Avatar initials={player ? getInitials(player.name) : '?'} size={26} />
-                      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player?.name ?? '?'}</span>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: isDnf ? 'var(--ink-soft)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player?.name ?? '?'}</span>
                     </div>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--ink-soft)', textAlign: 'center' }}>{gross ?? '—'}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)', textAlign: 'center' }}>{s.strokes ?? '—'}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, textAlign: 'center', color: diffColor }}>
-                      {netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—'}
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--ink-faint)', textAlign: 'center' }}>{isDnf ? '—' : (gross ?? '—')}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: isDnf ? 'var(--ink-faint)' : 'var(--ink)', textAlign: 'center' }}>{isDnf ? '—' : (s.strokes ?? '—')}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, textAlign: 'center', color: isDnf ? 'var(--ink-faint)' : diffColor }}>
+                      {isDnf ? '—' : (netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—')}
                     </span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, textAlign: 'center', color: isFirst ? 'var(--trophy-gold)' : 'var(--ink)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, textAlign: 'center', color: isFirst ? 'var(--trophy-gold)' : isDnf ? 'var(--ink-soft)' : 'var(--ink)' }}>
                       {s.points_earned != null ? (Number(s.points_earned) % 1 === 0 ? String(s.points_earned) : Number(s.points_earned).toFixed(1)) : '—'}
                     </span>
                   </div>
