@@ -107,8 +107,13 @@ export default function SchedulePage() {
     await load()
   }
 
-  const upcoming = rounds.filter(r => r.date >= today)
-  const past     = rounds.filter(r => r.date < today)
+  // Scored rounds always live in Past; unscored future rounds are Upcoming
+  const upcoming = rounds
+    .filter(r => !r.hasScores && r.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))          // soonest first
+  const past = rounds
+    .filter(r => r.hasScores || r.date < today)
+    .sort((a, b) => b.date.localeCompare(a.date))           // most recent first
 
   return (
     <div>
