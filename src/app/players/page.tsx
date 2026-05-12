@@ -6,8 +6,11 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Player } from '@/lib/database.types'
 import { toast } from 'sonner'
-import { Search, X, Plus } from 'lucide-react'
+import { Search, X, Plus, ChevronLeft } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
+import { useRouter } from 'next/navigation'
+
+const ADMIN_EMAIL = 'ponhak@gmail.com'
 
 function Avatar({ initials, size = 40 }: { initials: string; size?: number }) {
   return (
@@ -29,6 +32,8 @@ function getInitials(name: string) {
 
 export default function PlayersPage() {
   const { session } = useAuth()
+  const router = useRouter()
+  const isAdmin = session?.user.email === ADMIN_EMAIL
   const [players, setPlayers] = useState<Player[]>([])
   const [newName, setNewName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -80,6 +85,25 @@ export default function PlayersPage() {
 
   return (
     <div style={{ background: 'var(--bunker-sand)', minHeight: '100%' }}>
+      {/* Admin back button */}
+      {isAdmin && (
+        <div style={{
+          background: 'var(--tour-navy)',
+          padding: '14px 16px 12px',
+          borderBottom: '2px solid var(--trophy-gold)',
+        }}>
+          <button
+            onClick={() => router.push('/admin')}
+            style={{ background: 'transparent', border: 0, color: 'rgba(255,255,255,.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', padding: 0, marginBottom: 8 }}
+          >
+            <ChevronLeft size={14} strokeWidth={2.5} /> Admin
+          </button>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 28, textTransform: 'uppercase', letterSpacing: '.02em', color: '#fff', lineHeight: 1 }}>
+            Field
+          </div>
+        </div>
+      )}
+
       {/* Search bar */}
       <div style={{
         padding: '14px 16px',
