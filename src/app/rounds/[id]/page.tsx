@@ -29,20 +29,26 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
   const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean)
 
   const skipRe = /slagspel|poangbogey|resultat|spelat|leaderboard|spelinfo|spelflode|johannesberg|donald|steel|\bbook\b|\bgame\b/i
-  // Captures: [1] optional HCP digits, [2] net score (2-3 digits), [3] net +/- vs par
-  const scoreRe = /(?:HCP(\d+)\s+)?(\d{2,3})\s+([+\-]\d+)/i
-  const standaloneHcpRe = /^HCP\s+\d/i
+  // Captures: [1] optional inline HCP digits, [2] net score (2-3 digits), [3] net +/- vs par
+  const scoreRe = /(?:HCP\s*(\d+)\s+)?(\d{2,3})\s+([+\-]\d+)/i
+  // Standalone HCP line (e.g. "HCP 8" or "HCP8") — captures the value instead of discarding it
+  const standaloneHcpRe = /^HCP\s*(\d+)$/i
   const nameOnlyRe = /^[A-Za-zÅÄÖåäöÉéÜü\s\-]{3,}$/
 
   let pendingName: string | null = null
+  let pendingHcp: number | null = null
 
   for (const line of lines) {
     if (/^#/.test(line) || skipRe.test(line)) continue
-    if (standaloneHcpRe.test(line)) { pendingName = null; continue }
+
+    // Standalone HCP line — store value, keep pendingName intact
+    const hcpLineMatch = line.match(standaloneHcpRe)
+    if (hcpLineMatch) { pendingHcp = Number(hcpLineMatch[1]); continue }
 
     const scoreMatch = line.match(scoreRe)
     if (scoreMatch) {
-      const hcp = scoreMatch[1] != null ? Number(scoreMatch[1]) : null
+      // Prefer inline HCP from the score line; fall back to a preceding standalone HCP line
+      const hcp = scoreMatch[1] != null ? Number(scoreMatch[1]) : pendingHcp
       const strokes = Number(scoreMatch[2])
       const netDiff = scoreMatch[3] != null ? Number(scoreMatch[3]) : null
       if (strokes >= 55 && strokes <= 160) {
@@ -51,7 +57,7 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
           // Name on same line as score — strip rank prefix, HCPxx, and score onwards
           name = line
             .replace(/^\d+[.\)\s]\s*/, '')
-            .replace(/HCP\d+/gi, '')
+            .replace(/HCP\s*\d+/gi, '')
             .replace(/\d{2,3}\s+[+\-]\d.*$/, '')
             .replace(/\s+/g, ' ')
             .trim()
@@ -59,10 +65,11 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
         if (name && name.length > 1) results.push({ name, strokes, hcp, netDiff })
       }
       pendingName = null
+      pendingHcp = null
       continue
     }
 
-    if (nameOnlyRe.test(line)) pendingName = line
+    if (nameOnlyRe.test(line)) { pendingName = line; pendingHcp = null }
   }
 
   return results
