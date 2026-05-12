@@ -754,7 +754,7 @@ export default function RoundPage() {
               <span key={label} style={{
                 fontSize: 9, fontWeight: 700, letterSpacing: '.12em',
                 textTransform: 'uppercase', color: 'var(--ink-soft)',
-                textAlign: i === 0 ? 'left' : 'right',
+                textAlign: i === 0 ? 'left' : i === 2 ? 'center' : 'right',
               }}>{label}</span>
             ))}
           </div>
@@ -786,7 +786,7 @@ export default function RoundPage() {
                 <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 15, color: gross != null ? 'var(--ink-soft)' : 'var(--ink-faint)' }}>
                   {gross ?? '—'}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
                   <input
                     type="number"
                     min={30}
@@ -833,7 +833,7 @@ export default function RoundPage() {
                 }}
               >
                 <Save size={16} strokeWidth={2} />
-                {saving ? 'Saving…' : 'Save Scores & Calculate Points'}
+                {saving ? 'Saving…' : 'Save & Finish Round'}
               </button>
             </div>
           )}
