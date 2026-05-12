@@ -150,6 +150,12 @@ export default function RoundPage() {
   const [starting, setStarting] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
 
+  // Round detail edit state (setup view)
+  const [editDate, setEditDate] = useState('')
+  const [editVenue, setEditVenue] = useState('')
+  const [editTeeTime, setEditTeeTime] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+
   useEffect(() => { loadRound() }, [id])
 
   async function loadRound() {
@@ -167,7 +173,12 @@ export default function RoundPage() {
       db.from('players').select('*').order('name'),
     ])
 
-    if (roundData) setRound(roundData as Round)
+    if (roundData) {
+      setRound(roundData as Round)
+      setEditDate(roundData.date ?? '')
+      setEditVenue(roundData.notes ?? '')
+      setEditTeeTime(roundData.tee_time ?? '')
+    }
 
     const loadedPlayers: Player[] = rpData
       ? (rpData as { player_id: string; players: Player }[]).map(r => r.players).sort((a, b) => a.name.localeCompare(b.name))
@@ -261,6 +272,24 @@ export default function RoundPage() {
       toast.error('Failed to start round')
     }
     setStarting(false)
+  }
+
+  async function saveRoundDetails() {
+    if (!editDate) return
+    setEditSaving(true)
+    try {
+      const { error } = await db.from('rounds').update({
+        date: editDate,
+        notes: editVenue.trim() || null,
+        tee_time: editTeeTime || null,
+      }).eq('id', id)
+      if (error) throw error
+      toast.success('Round updated')
+      await loadRound()
+    } catch {
+      toast.error('Failed to update round')
+    }
+    setEditSaving(false)
   }
 
   // ── Score entry handlers ─────────────────────────────────────────────────
@@ -417,6 +446,92 @@ export default function RoundPage() {
         </div>
 
         <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Round detail editor */}
+          {session && (
+            <div style={{
+              background: '#fff',
+              border: '1px solid var(--bunker-sand-deep)',
+              borderRadius: 12,
+              boxShadow: 'var(--shadow-card)',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                padding: '10px 14px',
+                borderBottom: '1px solid var(--bunker-sand-deep)',
+                fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
+                textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--ink)',
+              }}>
+                Round Details
+              </div>
+              <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', display: 'block', marginBottom: 4 }}>
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={e => setEditDate(e.target.value)}
+                      style={{
+                        width: '100%', height: 38, padding: '0 10px',
+                        background: 'var(--bunker-sand)', border: '1px solid var(--bunker-sand-deep)',
+                        borderRadius: 6, color: 'var(--ink)', fontSize: 14, boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', display: 'block', marginBottom: 4 }}>
+                      First tee
+                    </label>
+                    <input
+                      type="time"
+                      value={editTeeTime}
+                      onChange={e => setEditTeeTime(e.target.value)}
+                      style={{
+                        width: '100%', height: 38, padding: '0 10px',
+                        background: 'var(--bunker-sand)', border: '1px solid var(--bunker-sand-deep)',
+                        borderRadius: 6, color: 'var(--ink)', fontSize: 14, boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', display: 'block', marginBottom: 4 }}>
+                    Venue
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Strand GK"
+                    value={editVenue}
+                    onChange={e => setEditVenue(e.target.value)}
+                    style={{
+                      width: '100%', height: 38, padding: '0 10px',
+                      background: 'var(--bunker-sand)', border: '1px solid var(--bunker-sand-deep)',
+                      borderRadius: 6, color: 'var(--ink)', fontSize: 14, boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={saveRoundDetails}
+                  disabled={editSaving || !editDate}
+                  style={{
+                    height: 38, borderRadius: 6, border: 0,
+                    background: editSaving || !editDate ? '#ccc' : 'var(--tour-navy)',
+                    color: editSaving || !editDate ? '#999' : '#F5EFE0',
+                    fontFamily: 'var(--font-body)', fontWeight: 700,
+                    fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
+                    cursor: editSaving || !editDate ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <Save size={14} strokeWidth={2.5} />
+                  {editSaving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Player selection */}
           <div style={{

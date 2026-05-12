@@ -2,13 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Clock, Users, CalendarDays } from 'lucide-react'
+import { Home, Clock, CalendarDays } from 'lucide-react'
 
 const tabs = [
   { id: 'home',     href: '/',           label: 'Home',     Icon: Home },
   { id: 'schedule', href: '/schedule',   label: 'Schedule', Icon: CalendarDays },
   { id: 'rounds',   href: '/rounds/new', label: 'Rounds',   Icon: Clock },
-  { id: 'players',  href: '/players',    label: 'Field',    Icon: Users },
 ]
 
 export function BottomTabBar() {
