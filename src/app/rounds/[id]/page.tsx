@@ -277,8 +277,9 @@ export default function RoundPage() {
       const { data: { text } } = await worker.recognize(dataUrl)
       await worker.terminate()
 
+      console.log('[OCR raw]', text)
       const extracted = parseGolfGameBook(text)
-      // Debug: keep raw OCR lines for error reporting
+      console.log('[OCR extracted]', extracted)
       const ocrLines = text.split('\n').map(l => l.trim()).filter(Boolean)
       const playerNames = players.map(p => p.name)
 
@@ -292,24 +293,24 @@ export default function RoundPage() {
         if (player && !matched[player.id]) {
           matched[player.id] = String(strokes)
           count++
+        } else if (!player) {
+          unmatched.push(`${name}→${playerName}??(${strokes})`)
         }
       }
 
+      const extractedSummary = extracted.map(e => `${e.name}=${e.strokes}`).join(' | ')
       if (count === 0) {
-        const found = extracted.map(e => `${e.name}(${e.strokes})`).join(', ')
         const rawPreview = ocrLines.slice(0, 6).join(' / ')
         toast.error(
-          found
-            ? `No names matched. Extracted: ${found}`
-            : `Nothing parsed. OCR read: "${rawPreview}"`,
-          { duration: 12000 }
+          extracted.length
+            ? `No names matched. Parsed: ${extractedSummary}`
+            : `Nothing parsed. OCR: "${rawPreview}"`,
+          { duration: 15000 }
         )
       } else {
         setScores(prev => ({ ...prev, ...matched }))
-        const msg = unmatched.length
-          ? `Filled ${count}/${players.length}. Unmatched: ${unmatched.join(', ')}`
-          : `Filled ${count} of ${players.length} scores`
-        toast.success(msg, { duration: 8000 })
+        const detail = unmatched.length ? ` | Unmatched: ${unmatched.join(', ')}` : ''
+        toast.success(`Filled ${count}/${players.length} | ${extractedSummary}${detail}`, { duration: 15000 })
       }
     } catch (err) {
       toast.error('Scan failed: ' + (err instanceof Error ? err.message : String(err)))
