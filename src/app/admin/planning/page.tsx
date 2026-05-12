@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import { toast } from 'sonner'
-import { ShieldCheck, ChevronLeft, Zap, Save, SendHorizonal } from 'lucide-react'
+import { ShieldCheck, ChevronLeft, Zap, Save, RefreshCw } from 'lucide-react'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -20,6 +20,7 @@ interface PlanRound {
   name: string
   date: string
   double_points: boolean
+  linked_round_id: string | null  // tracks the corresponding schedule round
 }
 
 function inputStyle(overrides?: React.CSSProperties): React.CSSProperties {
@@ -38,15 +39,16 @@ export default function PlanningPage() {
 
   const [year, setYear]               = useState(THIS_YEAR)
   const [planId, setPlanId]           = useState<string | null>(null)
-  const [planStatus, setPlanStatus]   = useState<string>('draft')
   const [maxFieldSize, setMaxFieldSize] = useState(8)
   const [totalRounds, setTotalRounds]   = useState(8)
   const [planRounds, setPlanRounds]     = useState<PlanRound[]>([])
+  const [pendingDeletions, setPendingDeletions] = useState<string[]>([]) // linked_round_ids to cascade-delete on save
   const [saving, setSaving]   = useState(false)
-  const [pushing, setPushing] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
 
   const isAdmin = session?.user.email === ADMIN_EMAIL
+  const isSynced = planRounds.some(r => r.linked_round_id)
 
   useEffect(() => {
     if (isAdmin) loadPlan(year)
@@ -55,6 +57,7 @@ export default function PlanningPage() {
 
   async function loadPlan(y: number) {
     setDataLoaded(false)
+    setPendingDeletions([])
     const { data: planArr } = await db
       .from('season_plans')
       .select('*')
@@ -64,7 +67,6 @@ export default function PlanningPage() {
 
     if (plan) {
       setPlanId(plan.id)
-      setPlanStatus(plan.status)
       setMaxFieldSize(plan.max_field_size)
       setTotalRounds(plan.total_rounds)
 
@@ -80,18 +82,18 @@ export default function PlanningPage() {
         name: r.name ?? '',
         date: r.date ?? '',
         double_points: r.double_points ?? false,
+        linked_round_id: r.round_id ?? null,
       }))
       while (loaded.length < plan.total_rounds) {
-        loaded.push({ round_number: loaded.length + 1, name: '', date: '', double_points: false })
+        loaded.push({ round_number: loaded.length + 1, name: '', date: '', double_points: false, linked_round_id: null })
       }
       setPlanRounds(loaded)
     } else {
       setPlanId(null)
-      setPlanStatus('draft')
       setMaxFieldSize(8)
       setTotalRounds(8)
       setPlanRounds(Array.from({ length: 8 }, (_, i) => ({
-        round_number: i + 1, name: '', date: '', double_points: false,
+        round_number: i + 1, name: '', date: '', double_points: false, linked_round_id: null,
       })))
     }
     setDataLoaded(true)
@@ -101,9 +103,15 @@ export default function PlanningPage() {
     const clamped = Math.max(1, Math.min(20, n))
     setTotalRounds(clamped)
     setPlanRounds(prev => {
+      if (clamped < prev.length) {
+        // Collect linked schedule rounds that will be removed
+        const removed = prev.slice(clamped)
+        const toDelete = removed.filter(r => r.linked_round_id).map(r => r.linked_round_id!)
+        if (toDelete.length > 0) setPendingDeletions(d => [...d, ...toDelete])
+      }
       const next = [...prev]
       while (next.length < clamped) {
-        next.push({ round_number: next.length + 1, name: '', date: '', double_points: false })
+        next.push({ round_number: next.length + 1, name: '', date: '', double_points: false, linked_round_id: null })
       }
       return next.slice(0, clamped).map((r, i) => ({ ...r, round_number: i + 1 }))
     })
@@ -111,6 +119,37 @@ export default function PlanningPage() {
 
   function updateRound(index: number, updates: Partial<PlanRound>) {
     setPlanRounds(prev => prev.map((r, i) => i === index ? { ...r, ...updates } : r))
+  }
+
+  // Cascade-delete a schedule round and all its related data
+  async function cascadeDeleteRound(roundId: string) {
+    const { data: groupData } = await db.from('groups').select('id').eq('round_id', roundId)
+    const groupIds = (groupData ?? []).map((g: { id: string }) => g.id)
+    if (groupIds.length > 0) {
+      await db.from('group_members').delete().in('group_id', groupIds)
+      await db.from('groups').delete().eq('round_id', roundId)
+    }
+    await db.from('round_players').delete().eq('round_id', roundId)
+    await db.from('scores').delete().eq('round_id', roundId)
+    await db.from('rounds').delete().eq('id', roundId)
+  }
+
+  // Persist plan rounds to DB (delete-all + re-insert, preserving linked_round_id)
+  async function persistPlanRounds(pid: string, rounds: PlanRound[]) {
+    await db.from('season_plan_rounds').delete().eq('plan_id', pid)
+    if (rounds.length > 0) {
+      const { error } = await db.from('season_plan_rounds').insert(
+        rounds.map(r => ({
+          plan_id: pid,
+          round_number: r.round_number,
+          name: r.name,
+          date: r.date || null,
+          double_points: r.double_points,
+          round_id: r.linked_round_id || null,
+        }))
+      )
+      if (error) throw error
+    }
   }
 
   async function saveDraft() {
@@ -135,20 +174,13 @@ export default function PlanningPage() {
         if (error) throw error
       }
 
-      await db.from('season_plan_rounds').delete().eq('plan_id', currentPlanId)
-      if (planRounds.length > 0) {
-        const { error } = await db.from('season_plan_rounds').insert(
-          planRounds.map(r => ({
-            plan_id: currentPlanId,
-            round_number: r.round_number,
-            name: r.name,
-            date: r.date || null,
-            double_points: r.double_points,
-          }))
-        )
-        if (error) throw error
+      // Delete removed schedule rounds
+      for (const roundId of pendingDeletions) {
+        await cascadeDeleteRound(roundId)
       }
+      setPendingDeletions([])
 
+      await persistPlanRounds(currentPlanId!, planRounds)
       toast.success('Draft saved')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
@@ -157,42 +189,71 @@ export default function PlanningPage() {
     setSaving(false)
   }
 
-  async function pushLive() {
+  async function syncSchedule() {
     const roundsWithDates = planRounds.filter(r => r.date)
     if (roundsWithDates.length === 0) {
-      toast.error('Add dates to at least one round before going live')
+      toast.error('Add dates to at least one round before syncing')
       return
     }
-    if (!confirm(`This will add ${roundsWithDates.length} placeholder round(s) to the schedule for ${year}. Continue?`)) return
+    if (!confirm(`Sync ${roundsWithDates.length} round(s) to the schedule?`)) return
 
-    setPushing(true)
+    setSyncing(true)
     try {
-      // Save draft first to make sure planId exists
-      if (!planId) await saveDraft()
-
-      for (const r of roundsWithDates) {
-        const { error } = await db.from('rounds').insert({
-          date: r.date,
-          group_size: maxFieldSize,
-          notes: r.name || null,
-          double_points: r.double_points,
-        })
+      // Ensure plan exists first
+      let currentPlanId = planId
+      if (!currentPlanId) {
+        const { data, error } = await db
+          .from('season_plans')
+          .insert({ year, max_field_size: maxFieldSize, total_rounds: totalRounds, status: 'live' })
+          .select('id')
+          .single()
         if (error) throw error
+        currentPlanId = data.id
+        setPlanId(currentPlanId)
+      } else {
+        await db.from('season_plans').update({ max_field_size: maxFieldSize, total_rounds: totalRounds, status: 'live' }).eq('id', currentPlanId)
       }
 
-      const { error } = await db
-        .from('season_plans')
-        .update({ status: 'live' })
-        .eq('year', year)
-      if (error) throw error
+      // Delete removed schedule rounds
+      for (const roundId of pendingDeletions) {
+        await cascadeDeleteRound(roundId)
+      }
+      setPendingDeletions([])
 
-      setPlanStatus('live')
-      toast.success(`${roundsWithDates.length} rounds added to the schedule`)
+      // Sync each plan round that has a date
+      const updatedRounds = await Promise.all(planRounds.map(async r => {
+        if (!r.date) return r
+
+        if (r.linked_round_id) {
+          // Update existing schedule round
+          await db.from('rounds').update({
+            date: r.date,
+            notes: r.name || null,
+            double_points: r.double_points,
+            group_size: maxFieldSize,
+          }).eq('id', r.linked_round_id)
+          return r
+        } else {
+          // Create new schedule round
+          const { data, error } = await db.from('rounds').insert({
+            date: r.date,
+            group_size: maxFieldSize,
+            notes: r.name || null,
+            double_points: r.double_points,
+          }).select('id').single()
+          if (error) throw error
+          return { ...r, linked_round_id: data.id as string }
+        }
+      }))
+
+      setPlanRounds(updatedRounds)
+      await persistPlanRounds(currentPlanId!, updatedRounds)
+      toast.success('Schedule synced')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast.error(err.message)
     }
-    setPushing(false)
+    setSyncing(false)
   }
 
   if (loading) return null
@@ -205,8 +266,6 @@ export default function PlanningPage() {
       </div>
     )
   }
-
-  const isLive = planStatus === 'live'
 
   return (
     <div style={{ background: 'var(--bunker-sand)', minHeight: '100%', paddingBottom: 40 }}>
@@ -230,14 +289,13 @@ export default function PlanningPage() {
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 28, textTransform: 'uppercase', letterSpacing: '.02em', color: '#fff', lineHeight: 1 }}>
             Seasonal Planning
           </div>
-          {dataLoaded && (
+          {dataLoaded && isSynced && (
             <span style={{
               fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase',
               padding: '3px 9px', borderRadius: 999,
-              background: isLive ? 'rgba(31,122,76,.25)' : 'rgba(201,162,74,.20)',
-              color: isLive ? '#6ee7b7' : 'var(--trophy-gold)',
+              background: 'rgba(31,122,76,.25)', color: '#6ee7b7',
             }}>
-              {isLive ? 'Live' : 'Draft'}
+              Synced
             </span>
           )}
         </div>
@@ -270,34 +328,25 @@ export default function PlanningPage() {
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 10 }}>
               Season Setup
             </div>
-            <div style={{
-              background: '#fff', border: '1px solid var(--bunker-sand-deep)',
-              borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden',
-            }}>
+            <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
-                {/* Max Field Size */}
                 <div style={{ padding: '14px 16px', borderRight: '1px solid var(--bunker-sand-deep)' }}>
                   <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', display: 'block', marginBottom: 6 }}>
                     Max Field
                   </label>
                   <input
-                    type="number"
-                    min={2}
-                    max={60}
+                    type="number" min={2} max={60}
                     value={maxFieldSize}
-                    onChange={e => setMaxFieldSize(parseInt(e.target.value) || 20)}
+                    onChange={e => setMaxFieldSize(parseInt(e.target.value) || 8)}
                     style={{ ...inputStyle(), width: '100%' }}
                   />
                 </div>
-                {/* Total Rounds */}
                 <div style={{ padding: '14px 16px' }}>
                   <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', display: 'block', marginBottom: 6 }}>
                     Total Rounds
                   </label>
                   <input
-                    type="number"
-                    min={1}
-                    max={20}
+                    type="number" min={1} max={20}
                     value={totalRounds}
                     onChange={e => handleTotalRoundsChange(parseInt(e.target.value) || 1)}
                     style={{ ...inputStyle(), width: '100%' }}
@@ -320,17 +369,9 @@ export default function PlanningPage() {
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 10 }}>
               Round Schedule
             </div>
-            <div style={{
-              background: '#fff', border: '1px solid var(--bunker-sand-deep)',
-              borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden',
-            }}>
+            <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
               {/* Column headers */}
-              <div style={{
-                display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px',
-                gap: 8, padding: '8px 14px',
-                borderBottom: '1px solid var(--bunker-sand-deep)',
-                background: 'var(--bunker-sand)',
-              }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--bunker-sand-deep)', background: 'var(--bunker-sand)' }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px' }}>#</span>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px' }}>Name</span>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px' }}>Date</span>
@@ -340,13 +381,9 @@ export default function PlanningPage() {
               {planRounds.map((r, i) => (
                 <div
                   key={i}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px',
-                    gap: 8, padding: '10px 14px', alignItems: 'center',
-                    borderBottom: i < planRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
-                  }}
+                  style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px', gap: 8, padding: '10px 14px', alignItems: 'center', borderBottom: i < planRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}
                 >
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-faint)', textAlign: 'center' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: r.linked_round_id ? 'var(--fairway-green)' : 'var(--ink-faint)', textAlign: 'center' }}>
                     {r.round_number}
                   </span>
                   <input
@@ -362,7 +399,6 @@ export default function PlanningPage() {
                     onChange={e => updateRound(i, { date: e.target.value })}
                     style={{ ...inputStyle(), width: '100%', colorScheme: 'light' }}
                   />
-                  {/* Double points toggle */}
                   <button
                     type="button"
                     onClick={() => updateRound(i, { double_points: !r.double_points })}
@@ -373,9 +409,7 @@ export default function PlanningPage() {
                       color: r.double_points ? 'var(--trophy-gold)' : 'var(--ink-faint)',
                       fontSize: 11, fontWeight: 800, cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      letterSpacing: '.04em',
                     }}
-                    title={r.double_points ? 'Double points (click to remove)' : 'Normal points (click for 2×)'}
                   >
                     2×
                   </button>
@@ -388,10 +422,11 @@ export default function PlanningPage() {
           <div style={{ padding: '20px 16px 0', display: 'flex', gap: 10 }}>
             <button
               onClick={saveDraft}
-              disabled={saving}
+              disabled={saving || syncing}
               style={{
-                flex: 1, height: 44, borderRadius: 8, border: 0, cursor: saving ? 'not-allowed' : 'pointer',
-                background: saving ? '#ccc' : 'var(--tour-navy)',
+                flex: 1, height: 44, borderRadius: 8, border: 0,
+                cursor: saving || syncing ? 'not-allowed' : 'pointer',
+                background: saving || syncing ? '#ccc' : 'var(--tour-navy)',
                 color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
               }}
@@ -400,27 +435,25 @@ export default function PlanningPage() {
               {saving ? 'Saving…' : 'Save Draft'}
             </button>
             <button
-              onClick={pushLive}
-              disabled={pushing || isLive}
-              title={isLive ? 'Already pushed live' : 'Push rounds to schedule'}
+              onClick={syncSchedule}
+              disabled={saving || syncing}
               style={{
                 flex: 1, height: 44, borderRadius: 8, border: 0,
-                cursor: pushing || isLive ? 'not-allowed' : 'pointer',
-                background: isLive ? 'rgba(31,122,76,.12)' : pushing ? '#ccc' : 'var(--tournament-red)',
-                color: isLive ? 'var(--fairway-green)' : '#fff',
-                fontWeight: 700, fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
+                cursor: saving || syncing ? 'not-allowed' : 'pointer',
+                background: saving || syncing ? '#ccc' : 'var(--tournament-red)',
+                color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
               }}
             >
-              <SendHorizonal size={15} strokeWidth={2.5} />
-              {isLive ? 'Live ✓' : pushing ? 'Pushing…' : 'Push Live'}
+              <RefreshCw size={15} strokeWidth={2.5} />
+              {syncing ? 'Syncing…' : 'Sync to Schedule'}
             </button>
           </div>
 
-          {isLive && (
+          {pendingDeletions.length > 0 && (
             <div style={{ padding: '10px 16px 0' }}>
-              <p style={{ fontSize: 12, color: 'var(--ink-faint)', margin: 0, textAlign: 'center' }}>
-                Rounds are live. Edit them individually from the Schedule or Manage Data pages.
+              <p style={{ fontSize: 12, color: 'var(--tournament-red)', margin: 0, textAlign: 'center' }}>
+                {pendingDeletions.length} linked round(s) will be removed from the schedule on next save.
               </p>
             </div>
           )}
