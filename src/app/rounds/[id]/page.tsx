@@ -26,23 +26,42 @@ const NICKNAMES: Record<string, string[]> = {
 
 function parseGolfGameBook(ocrText: string): { name: string; strokes: number }[] {
   const results: { name: string; strokes: number }[] = []
-  for (const raw of ocrText.split('\n')) {
-    const line = raw.trim()
-    if (!line) continue
-    if (/^hcp\s/i.test(line) || /handicaprond/i.test(line)) continue
-    // Rank prefix: "1 ", "1. ", "1) " — all optional
-    const rankPrefix = /^(?:\d+[\.\)]?\s+)?/
-    const name = /([A-Za-zÅÄÖåäöÉéÜü\s\-]{4,}?)/
-    const score = /(\d{2,3})/
-    const m = line.match(new RegExp(rankPrefix.source + name.source + /\s{2,}/.source + score.source + /\s+[+\-]/.source))
-      ?? line.match(new RegExp(rankPrefix.source + name.source + /\s+/.source + score.source + /\s+[+\-]/.source))
-      ?? line.match(new RegExp(rankPrefix.source + name.source + /\s{2,}/.source + score.source + /(?:\s|$)/.source))
-      ?? line.match(new RegExp(rankPrefix.source + name.source + /\s+/.source + score.source + /(?:\s|$)/.source))
-    if (!m) continue
-    const strokes = Number(m[2])
-    if (strokes < 55 || strokes > 160) continue
-    results.push({ name: m[1].trim(), strokes })
+  const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean)
+
+  const skipRe = /slagspel|poangbogey|resultat|spelat|leaderboard|spelinfo|spelflode|johannesberg|donald|steel|\bbook\b|\bgame\b/i
+  const scoreRe = /(\d{2,3})\s+[+\-]\d/
+  const standaloneHcpRe = /^HCP\s+\d/i
+  const nameOnlyRe = /^[A-Za-zÅÄÖåäöÉéÜü\s\-]{3,}$/
+
+  let pendingName: string | null = null
+
+  for (const line of lines) {
+    if (/^#/.test(line) || skipRe.test(line)) continue
+    if (standaloneHcpRe.test(line)) { pendingName = null; continue }
+
+    const scoreMatch = line.match(scoreRe)
+    if (scoreMatch) {
+      const strokes = Number(scoreMatch[1])
+      if (strokes >= 55 && strokes <= 160) {
+        let name = pendingName
+        if (!name) {
+          // Name on same line as score — strip rank prefix, HCPxx, and score onwards
+          name = line
+            .replace(/^\d+[.\)\s]\s*/, '')
+            .replace(/HCP\d+/gi, '')
+            .replace(/\d{2,3}\s+[+\-]\d.*$/, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+        }
+        if (name && name.length > 1) results.push({ name, strokes })
+      }
+      pendingName = null
+      continue
+    }
+
+    if (nameOnlyRe.test(line)) pendingName = line
   }
+
   return results
 }
 
