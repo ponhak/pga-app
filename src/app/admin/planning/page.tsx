@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import { toast } from 'sonner'
-import { ShieldCheck, ChevronLeft, Zap, Save, RefreshCw } from 'lucide-react'
+import { ShieldCheck, ChevronLeft, Zap, Save, RefreshCw, X } from 'lucide-react'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -119,6 +119,19 @@ export default function PlanningPage() {
 
   function updateRound(index: number, updates: Partial<PlanRound>) {
     setPlanRounds(prev => prev.map((r, i) => i === index ? { ...r, ...updates } : r))
+  }
+
+  function removeRound(index: number) {
+    setPlanRounds(prev => {
+      const removed = prev[index]
+      if (removed.linked_round_id) {
+        setPendingDeletions(d => [...d, removed.linked_round_id!])
+      }
+      return prev
+        .filter((_, i) => i !== index)
+        .map((r, i) => ({ ...r, round_number: i + 1 }))
+    })
+    setTotalRounds(n => n - 1)
   }
 
   // Cascade-delete a schedule round and all its related data
@@ -371,17 +384,18 @@ export default function PlanningPage() {
             </div>
             <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
               {/* Column headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--bunker-sand-deep)', background: 'var(--bunker-sand)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px 32px', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--bunker-sand-deep)', background: 'var(--bunker-sand)' }}>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px' }}>#</span>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px' }}>Name</span>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px' }}>Date</span>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px', textAlign: 'center' }}>2×</span>
+                <span />
               </div>
 
               {planRounds.map((r, i) => (
                 <div
                   key={i}
-                  style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px', gap: 8, padding: '10px 14px', alignItems: 'center', borderBottom: i < planRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}
+                  style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px 32px', gap: 8, padding: '10px 14px', alignItems: 'center', borderBottom: i < planRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}
                 >
                   <span style={{ fontSize: 12, fontWeight: 700, color: r.linked_round_id ? 'var(--fairway-green)' : 'var(--ink-faint)', textAlign: 'center' }}>
                     {r.round_number}
@@ -412,6 +426,18 @@ export default function PlanningPage() {
                     }}
                   >
                     2×
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeRound(i)}
+                    title="Remove this round"
+                    style={{
+                      width: 32, height: 36, borderRadius: 7, border: '1.5px solid var(--bunker-sand-deep)',
+                      background: 'transparent', color: 'var(--tournament-red)',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <X size={13} strokeWidth={2.5} />
                   </button>
                 </div>
               ))}
