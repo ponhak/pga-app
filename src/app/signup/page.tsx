@@ -22,20 +22,21 @@ export default function SignupPage() {
     e.preventDefault()
     setLoading(true)
 
-    // Check allowlist
-    const { data: rows, error: listError } = await db
-      .from('allowed_emails')
-      .select('email')
-      .eq('email', email.toLowerCase().trim())
-      .limit(1)
+    // Check allowlist via server route (avoids browser fetch header encoding issues)
+    const checkRes = await fetch('/api/check-allowlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    const { allowed, error: listError } = await checkRes.json()
 
     if (listError) {
-      toast.error('Allowlist check failed: ' + listError.message)
+      toast.error('Allowlist check failed: ' + listError)
       setLoading(false)
       return
     }
 
-    if (!rows || rows.length === 0) {
+    if (!allowed) {
       toast.error("Your email isn't on the approved list. Contact Pontus to get access.")
       setLoading(false)
       return
