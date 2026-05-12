@@ -745,14 +745,15 @@ export default function RoundPage() {
 
           {/* Column header */}
           <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 48px 64px 48px',
-            padding: '4px 14px 4px',
+            display: 'grid', gridTemplateColumns: '1fr 52px 60px 52px',
+            padding: '5px 14px',
+            background: 'var(--bunker-sand)',
             borderBottom: '1px solid var(--bunker-sand-deep)',
           }}>
             {(['PLAYER', 'GROSS', 'NET', '+/−'] as const).map((label, i) => (
               <span key={label} style={{
-                fontSize: 9, fontWeight: 700, letterSpacing: '.10em',
-                textTransform: 'uppercase', color: 'var(--ink-faint)',
+                fontSize: 9, fontWeight: 700, letterSpacing: '.12em',
+                textTransform: 'uppercase', color: 'var(--ink-soft)',
                 textAlign: i === 0 ? 'left' : 'right',
               }}>{label}</span>
             ))}
@@ -763,13 +764,18 @@ export default function RoundPage() {
             const hcp = hcpData[p.id] ?? null
             const gross = net != null && hcp != null ? net + hcp : null
             const netDiff = netDiffData[p.id] ?? null
+            const diffColor = netDiff == null
+              ? 'var(--ink-faint)'
+              : netDiff < 0
+                ? 'var(--tournament-red)'
+                : 'var(--ink)'
             return (
               <div
                 key={p.id}
                 style={{
-                  display: 'grid', gridTemplateColumns: '1fr 48px 64px 48px',
+                  display: 'grid', gridTemplateColumns: '1fr 52px 60px 52px',
                   alignItems: 'center',
-                  padding: '8px 14px',
+                  padding: '9px 14px',
                   borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
                 }}
               >
@@ -777,7 +783,7 @@ export default function RoundPage() {
                   <Avatar initials={getInitials(p.name)} size={28} />
                   <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
                 </div>
-                <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--ink-soft)' }}>
+                <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 15, color: gross != null ? 'var(--ink-soft)' : 'var(--ink-faint)' }}>
                   {gross ?? '—'}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -790,19 +796,19 @@ export default function RoundPage() {
                     onChange={e => session && setScores(prev => ({ ...prev, [p.id]: e.target.value }))}
                     readOnly={!session}
                     style={{
-                      width: 56, height: 34, textAlign: 'center',
+                      width: 52, height: 34, textAlign: 'center',
                       borderRadius: 6, border: '1.5px solid var(--bunker-sand-deep)',
                       background: scores[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)',
                       color: scores[p.id] ? '#F5EFE0' : 'var(--ink)',
-                      fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 15,
+                      fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 15,
                       outline: 'none', boxSizing: 'border-box',
                       cursor: session ? 'auto' : 'default',
                     }}
                   />
                 </div>
                 <div style={{
-                  textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
-                  color: netDiff == null ? 'var(--ink-faint)' : netDiff < 0 ? 'var(--fairway-green)' : netDiff === 0 ? 'var(--ink-soft)' : 'var(--tournament-red)',
+                  textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+                  color: diffColor,
                 }}>
                   {netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—'}
                 </div>
