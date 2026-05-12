@@ -31,7 +31,8 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
   const standaloneHcpRe = /^HCP\s*(\d+)$/i
   const nameOnlyRe  = /^[A-Za-zÅÄÖåäöÉéÜü\s\-]{3,}$/
   // With inline HCP: allow 1–3 digit strokes (HCP presence confirms it's a score line)
-  const scoreReHcp  = /HCP\s*(\d+)\s+(\d{1,3})\s+([+\-]?\d+)/i
+  // [^\d\s]? handles OCR artefacts between HCP value and strokes (e.g. "HCP22 | 81")
+  const scoreReHcp  = /HCP\s*(\d+)\s*[^\d\s]?\s*(\d{1,3})\s+([+\-]?\d+)/i
   // Without HCP: require 2–3 digit strokes to suppress false positives
   const scoreReNoHcp = /(\d{2,3})\s+([+\-]?\d+)/i
 
