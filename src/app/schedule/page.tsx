@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { CalendarDays, ChevronRight, Plus, X, MapPin, Trash2 } from 'lucide-react'
+import { CalendarDays, ChevronRight, Plus, X, MapPin } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,19 +77,6 @@ export default function SchedulePage() {
       }))
     )
     setLoading(false)
-  }
-
-  async function handleDelete(roundId: string) {
-    if (!confirm('Remove this round from the schedule?')) return
-    const { data: groupIds } = await db.from('groups').select('id').eq('round_id', roundId)
-    if (groupIds?.length) {
-      await db.from('group_members').delete().in('group_id', groupIds.map((g: { id: string }) => g.id))
-      await db.from('groups').delete().eq('round_id', roundId)
-    }
-    await db.from('round_players').delete().eq('round_id', roundId)
-    await db.from('scores').delete().eq('round_id', roundId)
-    await db.from('rounds').delete().eq('id', roundId)
-    await load()
   }
 
   async function handleAdd(e: React.FormEvent) {
@@ -246,10 +233,10 @@ export default function SchedulePage() {
       ) : (
         <div>
           {upcoming.length > 0 && (
-            <Section label="Upcoming" rounds={upcoming} today={today} session={!!session} onDelete={handleDelete} onNavigate={id => router.push(`/rounds/${id}`)} />
+            <Section label="Upcoming" rounds={upcoming} today={today} onNavigate={id => router.push(`/rounds/${id}`)} />
           )}
           {past.length > 0 && (
-            <Section label="Past rounds" rounds={past} today={today} session={!!session} onDelete={handleDelete} onNavigate={id => router.push(`/rounds/${id}`)} />
+            <Section label="Past rounds" rounds={past} today={today} onNavigate={id => router.push(`/rounds/${id}`)} />
           )}
         </div>
       )}
@@ -257,12 +244,10 @@ export default function SchedulePage() {
   )
 }
 
-function Section({ label, rounds, today, session, onDelete, onNavigate }: {
+function Section({ label, rounds, today, onNavigate }: {
   label: string
   rounds: RoundEntry[]
   today: string
-  session: boolean
-  onDelete: (id: string) => void
   onNavigate: (id: string) => void
 }) {
   return (
@@ -284,7 +269,6 @@ function Section({ label, rounds, today, session, onDelete, onNavigate }: {
           const status = getStatus(entry, today)
           const st = STATUS_STYLES[status]
           const d = new Date(entry.date + 'T12:00:00')
-          const canDelete = session && status !== 'scored'
           return (
             <div
               key={entry.id}
@@ -354,21 +338,7 @@ function Section({ label, rounds, today, session, onDelete, onNavigate }: {
                 {st.label}
               </span>
 
-              {canDelete ? (
-                <button
-                  onClick={e => { e.stopPropagation(); onDelete(entry.id) }}
-                  title="Remove round"
-                  style={{
-                    flexShrink: 0, width: 30, height: 30, borderRadius: 6, border: 0,
-                    background: 'rgba(200,16,46,.08)', color: 'var(--tournament-red)',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  <Trash2 size={14} strokeWidth={2} />
-                </button>
-              ) : (
-                <ChevronRight size={16} color="var(--ink-faint)" strokeWidth={2} />
-              )}
+              <ChevronRight size={16} color="var(--ink-faint)" strokeWidth={2} />
             </div>
           )
         })}
