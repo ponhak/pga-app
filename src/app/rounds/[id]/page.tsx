@@ -16,11 +16,12 @@ const db = supabase as any
 
 // ── Scorecard OCR helpers ────────────────────────────────────────────────────
 
+// App nickname → GolfGameBook real first names
 const NICKNAMES: Record<string, string[]> = {
   bulan: ['kristoffer'],
   champ: ['nicklas'],
   hasse: ['hans'],
-  stewe: ['steve', 'steven'],
+  nygren: ['niclas'],
 }
 
 function parseGolfGameBook(ocrText: string): { name: string; strokes: number }[] {
@@ -40,12 +41,17 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number }[]
 }
 
 function matchScorecardName(scorecardName: string, playerNames: string[]): string | null {
-  const first = scorecardName.split(/\s+/)[0].toLowerCase()
+  // Check every word in the scorecard name against every word in each player name
+  const scWords = scorecardName.toLowerCase().split(/\s+/)
   for (const pName of playerNames) {
-    const pFirst = pName.split(/\s+/)[0].toLowerCase()
-    if (pFirst === first) return pName
-    if ((NICKNAMES[pFirst] ?? []).includes(first)) return pName
-    if ((NICKNAMES[first] ?? []).includes(pFirst)) return pName
+    const pWords = pName.toLowerCase().split(/\s+/)
+    for (const sc of scWords) {
+      for (const pw of pWords) {
+        if (sc === pw) return pName
+        if ((NICKNAMES[pw] ?? []).includes(sc)) return pName
+        if ((NICKNAMES[sc] ?? []).includes(pw)) return pName
+      }
+    }
   }
   return null
 }
@@ -281,7 +287,11 @@ export default function RoundPage() {
       }
 
       if (count === 0) {
-        toast.error('No scores matched — names on scorecard may differ from player list')
+        const found = extracted.map(e => e.name).join(', ')
+        toast.error(
+          found ? `No names matched. Scorecard had: ${found}` : 'No scores found — check image quality',
+          { duration: 8000 }
+        )
       } else {
         setScores(prev => ({ ...prev, ...matched }))
         toast.success(`Filled ${count} of ${players.length} scores from scorecard`)
