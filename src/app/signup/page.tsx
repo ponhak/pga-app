@@ -23,11 +23,11 @@ export default function SignupPage() {
     setLoading(true)
 
     // Check allowlist
-    const { data: allowed, error: listError } = await db
+    const { data: rows, error: listError } = await db
       .from('allowed_emails')
       .select('email')
       .eq('email', email.toLowerCase().trim())
-      .maybeSingle()
+      .limit(1)
 
     if (listError) {
       toast.error('Allowlist check failed: ' + listError.message)
@@ -35,7 +35,7 @@ export default function SignupPage() {
       return
     }
 
-    if (!allowed) {
+    if (!rows || rows.length === 0) {
       toast.error("Your email isn't on the approved list. Contact Pontus to get access.")
       setLoading(false)
       return
