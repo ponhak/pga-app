@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import type { Player } from '@/lib/database.types'
 import { toast } from 'sonner'
 import { Search, X, Plus } from 'lucide-react'
+import { useAuth } from '@/components/AuthProvider'
 
 function Avatar({ initials, size = 40 }: { initials: string; size?: number }) {
   return (
@@ -27,6 +28,7 @@ function getInitials(name: string) {
 }
 
 export default function PlayersPage() {
+  const { session } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [newName, setNewName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -104,22 +106,24 @@ export default function PlayersPage() {
             }}
           />
         </div>
-        <button
-          onClick={() => setShowAdd(v => !v)}
-          style={{
-            width: 44, height: 44, borderRadius: 8, flexShrink: 0,
-            background: showAdd ? 'var(--tour-navy-soft)' : 'var(--tour-navy)',
-            border: 0, color: '#F5EFE0', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          aria-label={showAdd ? 'Cancel' : 'Add player'}
-        >
-          {showAdd ? <X size={18} strokeWidth={2} /> : <Plus size={18} strokeWidth={2} />}
-        </button>
+        {session && (
+          <button
+            onClick={() => setShowAdd(v => !v)}
+            style={{
+              width: 44, height: 44, borderRadius: 8, flexShrink: 0,
+              background: showAdd ? 'var(--tour-navy-soft)' : 'var(--tour-navy)',
+              border: 0, color: '#F5EFE0', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            aria-label={showAdd ? 'Cancel' : 'Add player'}
+          >
+            {showAdd ? <X size={18} strokeWidth={2} /> : <Plus size={18} strokeWidth={2} />}
+          </button>
+        )}
       </div>
 
       {/* Add player form */}
-      {showAdd && (
+      {session && showAdd && (
         <form
           onSubmit={addPlayer}
           style={{
@@ -205,18 +209,20 @@ export default function PlayersPage() {
                     <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{p.name}</div>
                   )}
                 </div>
-                <button
-                  onClick={() => deletePlayer(p)}
-                  style={{
-                    width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-                    background: 'transparent', border: '1px solid var(--bunker-sand-deep)',
-                    color: 'var(--ink-faint)', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                  aria-label={`Remove ${p.name}`}
-                >
-                  <X size={14} strokeWidth={2} />
-                </button>
+                {session && (
+                  <button
+                    onClick={() => deletePlayer(p)}
+                    style={{
+                      width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                      background: 'transparent', border: '1px solid var(--bunker-sand-deep)',
+                      color: 'var(--ink-faint)', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                    aria-label={`Remove ${p.name}`}
+                  >
+                    <X size={14} strokeWidth={2} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

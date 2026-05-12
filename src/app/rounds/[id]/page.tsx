@@ -9,6 +9,7 @@ import { assignPoints } from '@/lib/points'
 import type { Player, Round, Score } from '@/lib/database.types'
 import { toast } from 'sonner'
 import { ChevronLeft, Save, ScanLine, Loader2 } from 'lucide-react'
+import { useAuth } from '@/components/AuthProvider'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -80,6 +81,7 @@ function getInitials(name: string) {
 export default function RoundPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { session } = useAuth()
   const [round, setRound] = useState<Round | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [groups, setGroups] = useState<GroupWithMembers[]>([])
@@ -332,32 +334,36 @@ export default function RoundPage() {
               {isScored && (
                 <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>Edit and save to update</span>
               )}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={scanning}
-                title="Scan scorecard photo"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  height: 30, padding: '0 10px', borderRadius: 6, border: 0,
-                  background: scanning ? 'rgba(10,34,64,.06)' : 'var(--tour-navy)',
-                  color: scanning ? 'var(--ink-soft)' : '#F5EFE0',
-                  fontWeight: 700, fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase',
-                  cursor: scanning ? 'not-allowed' : 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {scanning
-                  ? <><Loader2 size={13} strokeWidth={2.5} style={{ animation: 'spin 1s linear infinite' }} /> Scanning…</>
-                  : <><ScanLine size={13} strokeWidth={2.5} /> Scan Card</>
-                }
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleScanUpload}
-              />
+              {session && (
+                <>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={scanning}
+                    title="Scan scorecard photo"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      height: 30, padding: '0 10px', borderRadius: 6, border: 0,
+                      background: scanning ? 'rgba(10,34,64,.06)' : 'var(--tour-navy)',
+                      color: scanning ? 'var(--ink-soft)' : '#F5EFE0',
+                      fontWeight: 700, fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase',
+                      cursor: scanning ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {scanning
+                      ? <><Loader2 size={13} strokeWidth={2.5} style={{ animation: 'spin 1s linear infinite' }} /> Scanning…</>
+                      : <><ScanLine size={13} strokeWidth={2.5} /> Scan Card</>
+                    }
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleScanUpload}
+                  />
+                </>
+              )}
             </div>
           </div>
 
@@ -379,7 +385,8 @@ export default function RoundPage() {
                 max={150}
                 placeholder="—"
                 value={scores[p.id] ?? ''}
-                onChange={(e) => setScores((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                onChange={(e) => session && setScores((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                readOnly={!session}
                 style={{
                   width: 72, height: 36, textAlign: 'center',
                   borderRadius: 6, border: '1.5px solid var(--bunker-sand-deep)',
@@ -387,31 +394,34 @@ export default function RoundPage() {
                   color: scores[p.id] ? '#F5EFE0' : 'var(--ink)',
                   fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 15,
                   outline: 'none', boxSizing: 'border-box',
+                  cursor: session ? 'auto' : 'default',
                 }}
               />
             </div>
           ))}
 
           {/* Save button */}
-          <div style={{ padding: '12px 14px' }}>
-            <button
-              onClick={saveScores}
-              disabled={saving}
-              style={{
-                width: '100%', height: 46,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                borderRadius: 8, border: 0,
-                background: saving ? '#ccc' : 'var(--tour-navy)',
-                color: saving ? '#666' : '#F5EFE0',
-                fontFamily: 'var(--font-body)', fontWeight: 700,
-                fontSize: 14, letterSpacing: '.06em', textTransform: 'uppercase',
-                cursor: saving ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <Save size={16} strokeWidth={2} />
-              {saving ? 'Saving…' : 'Save Scores & Calculate Points'}
-            </button>
-          </div>
+          {session && (
+            <div style={{ padding: '12px 14px' }}>
+              <button
+                onClick={saveScores}
+                disabled={saving}
+                style={{
+                  width: '100%', height: 46,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  borderRadius: 8, border: 0,
+                  background: saving ? '#ccc' : 'var(--tour-navy)',
+                  color: saving ? '#666' : '#F5EFE0',
+                  fontFamily: 'var(--font-body)', fontWeight: 700,
+                  fontSize: 14, letterSpacing: '.06em', textTransform: 'uppercase',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <Save size={16} strokeWidth={2} />
+                {saving ? 'Saving…' : 'Save Scores & Calculate Points'}
+              </button>
+            </div>
+          )}
         </div>
       </section>
 

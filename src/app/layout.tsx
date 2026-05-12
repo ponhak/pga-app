@@ -4,6 +4,7 @@ import './globals.css'
 import { NavBar } from '@/components/NavBar'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { Toaster } from '@/components/ui/sonner'
+import { AuthProvider } from '@/components/AuthProvider'
 
 const oswald = Oswald({
   subsets: ['latin'],
@@ -38,12 +39,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${oswald.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background" style={{ fontFamily: 'var(--font-body)' }}>
-        <NavBar />
-        <main className="flex-1 max-w-2xl mx-auto w-full pb-20">
-          {children}
-        </main>
-        <BottomTabBar />
-        <Toaster />
+        <AuthProvider>
+          <NavBar />
+          <main className="flex-1 max-w-2xl mx-auto w-full pb-20">
+            {children}
+          </main>
+          <BottomTabBar />
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   )

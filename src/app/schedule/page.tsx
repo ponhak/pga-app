@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { CalendarDays, ChevronRight, Plus, X, MapPin } from 'lucide-react'
+import { useAuth } from '@/components/AuthProvider'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -34,6 +35,7 @@ const STATUS_STYLES: Record<Status, { bg: string; color: string; label: string }
 }
 
 export default function SchedulePage() {
+  const { session } = useAuth()
   const [rounds, setRounds]     = useState<RoundEntry[]>([])
   const [loading, setLoading]   = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -111,22 +113,24 @@ export default function SchedulePage() {
             Schedule
           </div>
         </div>
-        <button
-          onClick={() => setShowForm(v => !v)}
-          style={{
-            width: 40, height: 40, borderRadius: 8,
-            background: showForm ? 'rgba(255,255,255,.12)' : 'var(--tournament-red)',
-            border: 0, color: '#fff', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          aria-label={showForm ? 'Cancel' : 'Add round'}
-        >
-          {showForm ? <X size={18} strokeWidth={2.5} /> : <Plus size={20} strokeWidth={2.5} />}
-        </button>
+        {session && (
+          <button
+            onClick={() => setShowForm(v => !v)}
+            style={{
+              width: 40, height: 40, borderRadius: 8,
+              background: showForm ? 'rgba(255,255,255,.12)' : 'var(--tournament-red)',
+              border: 0, color: '#fff', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            aria-label={showForm ? 'Cancel' : 'Add round'}
+          >
+            {showForm ? <X size={18} strokeWidth={2.5} /> : <Plus size={20} strokeWidth={2.5} />}
+          </button>
+        )}
       </div>
 
       {/* Add form */}
-      {showForm && (
+      {session && showForm && (
         <form
           onSubmit={handleAdd}
           style={{

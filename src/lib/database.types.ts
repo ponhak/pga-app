@@ -1,6 +1,16 @@
 export interface Database {
   public: {
     Tables: {
+      allowed_emails: {
+        Row: { email: string; added_at: string }
+        Insert: { email: string; added_at?: string }
+        Update: { email?: string; added_at?: string }
+      }
+      profiles: {
+        Row: { id: string; name: string; phone: string | null }
+        Insert: { id: string; name: string; phone?: string | null }
+        Update: { id?: string; name?: string; phone?: string | null }
+      }
       players: {
         Row: { id: string; name: string; created_at: string }
         Insert: { id?: string; name: string; created_at?: string }

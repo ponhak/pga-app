@@ -9,6 +9,7 @@ import type { Player } from '@/lib/database.types'
 import { randomizeGroups } from '@/lib/points'
 import { toast } from 'sonner'
 import { Shuffle, ChevronRight } from 'lucide-react'
+import { useAuth } from '@/components/AuthProvider'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -33,6 +34,7 @@ function getInitials(name: string) {
 
 export default function NewRoundPage() {
   const router = useRouter()
+  const { session, loading: authLoading } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [groupSize, setGroupSize] = useState(4)
@@ -41,11 +43,15 @@ export default function NewRoundPage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    if (!authLoading && !session) {
+      router.replace('/login')
+      return
+    }
     db.from('players').select('*').order('name').then(({ data }: { data: Player[] }) => {
       setPlayers(data ?? [])
       setSelected(new Set((data ?? []).map((p: Player) => p.id)))
     })
-  }, [])
+  }, [authLoading, session])
 
   function togglePlayer(id: string) {
     setSelected((prev) => {
