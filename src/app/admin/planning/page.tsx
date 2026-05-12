@@ -39,7 +39,7 @@ export default function PlanningPage() {
   const [year, setYear]               = useState(THIS_YEAR)
   const [planId, setPlanId]           = useState<string | null>(null)
   const [planStatus, setPlanStatus]   = useState<string>('draft')
-  const [maxFieldSize, setMaxFieldSize] = useState(20)
+  const [maxFieldSize, setMaxFieldSize] = useState(8)
   const [totalRounds, setTotalRounds]   = useState(8)
   const [planRounds, setPlanRounds]     = useState<PlanRound[]>([])
   const [saving, setSaving]   = useState(false)
@@ -88,7 +88,7 @@ export default function PlanningPage() {
     } else {
       setPlanId(null)
       setPlanStatus('draft')
-      setMaxFieldSize(20)
+      setMaxFieldSize(8)
       setTotalRounds(8)
       setPlanRounds(Array.from({ length: 8 }, (_, i) => ({
         round_number: i + 1, name: '', date: '', double_points: false,
