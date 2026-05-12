@@ -5,10 +5,10 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { assignPoints } from '@/lib/points'
+import { assignPoints, randomizeGroups } from '@/lib/points'
 import type { Player, Round, Score } from '@/lib/database.types'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, ScanLine, Loader2 } from 'lucide-react'
+import { ChevronLeft, Save, ScanLine, Loader2, Shuffle, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,7 +16,6 @@ const db = supabase as any
 
 // ── Scorecard OCR helpers ────────────────────────────────────────────────────
 
-// Swedish nickname pairs: key = nickname as stored in app, value = real-name variants on scorecard
 const NICKNAMES: Record<string, string[]> = {
   bulan: ['kristoffer'],
   champ: ['nicklas'],
@@ -29,9 +28,7 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number }[]
   for (const raw of ocrText.split('\n')) {
     const line = raw.trim()
     if (!line) continue
-    // Skip HCP / badge lines
     if (/^hcp\s/i.test(line) || /handicaprond/i.test(line)) continue
-    // Match: optional rank, name text, gross score (2-3 digits), signed par (+/-N)
     const m = line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]+?)\s{2,}(\d{2,3})\s+[+\-]\d/)
       ?? line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]+?)\s+(\d{2,3})\s+[+\-]\d/)
     if (!m) continue
@@ -47,7 +44,6 @@ function matchScorecardName(scorecardName: string, playerNames: string[]): strin
   for (const pName of playerNames) {
     const pFirst = pName.split(/\s+/)[0].toLowerCase()
     if (pFirst === first) return pName
-    // Check nickname table in both directions
     if ((NICKNAMES[pFirst] ?? []).includes(first)) return pName
     if ((NICKNAMES[first] ?? []).includes(pFirst)) return pName
   }
@@ -82,6 +78,8 @@ export default function RoundPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { session } = useAuth()
+
+  // Round + score entry state
   const [round, setRound] = useState<Round | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [groups, setGroups] = useState<GroupWithMembers[]>([])
@@ -91,33 +89,47 @@ export default function RoundPage() {
   const [scanning, setScanning] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Setup (pre-start) state
+  const [allPlayers, setAllPlayers] = useState<Player[]>([])
+  const [setupSelected, setSetupSelected] = useState<Set<string>>(new Set())
+  const [setupGroupSize, setSetupGroupSize] = useState(4)
+  const [setupGroups, setSetupGroups] = useState<string[][]>([])
+  const [starting, setStarting] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
+
   useEffect(() => { loadRound() }, [id])
 
   async function loadRound() {
-    const [{ data: roundData }, { data: rpData }, { data: grpData }, { data: scoreData }] =
-      await Promise.all([
-        db.from('rounds').select('*').eq('id', id).single(),
-        db.from('round_players').select('player_id, players(*)').eq('round_id', id),
-        db.from('groups').select('id, group_number, group_members(player_id, players(*))').eq('round_id', id).order('group_number'),
-        db.from('scores').select('*').eq('round_id', id),
-      ])
+    const [
+      { data: roundData },
+      { data: rpData },
+      { data: grpData },
+      { data: scoreData },
+      { data: allPlayersData },
+    ] = await Promise.all([
+      db.from('rounds').select('*').eq('id', id).single(),
+      db.from('round_players').select('player_id, players(*)').eq('round_id', id),
+      db.from('groups').select('id, group_number, group_members(player_id, players(*))').eq('round_id', id).order('group_number'),
+      db.from('scores').select('*').eq('round_id', id),
+      db.from('players').select('*').order('name'),
+    ])
 
     if (roundData) setRound(roundData as Round)
 
-    if (rpData) {
-      const ps = (rpData as { player_id: string; players: Player }[]).map((r) => r.players)
-      setPlayers(ps.sort((a, b) => a.name.localeCompare(b.name)))
-    }
+    const loadedPlayers: Player[] = rpData
+      ? (rpData as { player_id: string; players: Player }[]).map(r => r.players).sort((a, b) => a.name.localeCompare(b.name))
+      : []
+    setPlayers(loadedPlayers)
 
     if (grpData) {
       const mapped: GroupWithMembers[] = (grpData as {
         id: string
         group_number: number
         group_members: { player_id: string; players: Player }[]
-      }[]).map((g) => ({
+      }[]).map(g => ({
         id: g.id,
         group_number: g.group_number,
-        members: g.group_members.map((m) => m.players),
+        members: g.group_members.map(m => m.players),
       }))
       setGroups(mapped)
     }
@@ -126,12 +138,79 @@ export default function RoundPage() {
       const typed = scoreData as Score[]
       setSavedScores(typed)
       const existing: Record<string, string> = {}
-      typed.forEach((s) => {
-        if (s.strokes != null) existing[s.player_id] = String(s.strokes)
-      })
-      setScores((prev) => ({ ...prev, ...existing }))
+      typed.forEach(s => { if (s.strokes != null) existing[s.player_id] = String(s.strokes) })
+      setScores(prev => ({ ...prev, ...existing }))
     }
+
+    const ap = (allPlayersData ?? []) as Player[]
+    setAllPlayers(ap)
+
+    // Pre-select all players in setup mode if no players assigned yet
+    if (loadedPlayers.length === 0) {
+      setSetupSelected(new Set(ap.map(p => p.id)))
+    }
+
+    setDataLoaded(true)
   }
+
+  // ── Setup (pre-start) handlers ───────────────────────────────────────────
+
+  function toggleSetupPlayer(pid: string) {
+    setSetupSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(pid)) next.delete(pid)
+      else next.add(pid)
+      return next
+    })
+    setSetupGroups([])
+  }
+
+  function setupSelectAll() {
+    setSetupSelected(new Set(allPlayers.map(p => p.id)))
+    setSetupGroups([])
+  }
+
+  function doSetupRandomize() {
+    if (setupSelected.size < 2) { toast.error('Select at least 2 players'); return }
+    setSetupGroups(randomizeGroups(Array.from(setupSelected), setupGroupSize))
+  }
+
+  function nameOf(pid: string) {
+    return allPlayers.find(p => p.id === pid)?.name ?? pid
+  }
+
+  async function startRound() {
+    if (setupSelected.size < 2) { toast.error('Select at least 2 players'); return }
+    setStarting(true)
+    try {
+      await db.from('round_players').insert(
+        Array.from(setupSelected).map(pid => ({ round_id: id, player_id: pid }))
+      )
+
+      if (setupGroups.length > 0) {
+        for (let i = 0; i < setupGroups.length; i++) {
+          const { data: grp } = await db
+            .from('groups')
+            .insert({ round_id: id, group_number: i + 1 })
+            .select()
+            .single()
+          if (grp) {
+            await db.from('group_members').insert(
+              setupGroups[i].map((pid: string) => ({ group_id: grp.id, player_id: pid }))
+            )
+          }
+        }
+      }
+
+      toast.success('Round started!')
+      await loadRound()
+    } catch {
+      toast.error('Failed to start round')
+    }
+    setStarting(false)
+  }
+
+  // ── Score entry handlers ─────────────────────────────────────────────────
 
   async function saveScores() {
     const entries = Object.entries(scores)
@@ -148,7 +227,7 @@ export default function RoundPage() {
     setSaving(true)
     try {
       const results = assignPoints(entries)
-      const upserts = results.map((r) => ({
+      const upserts = results.map(r => ({
         round_id: id,
         player_id: r.playerId,
         strokes: r.strokes,
@@ -174,7 +253,6 @@ export default function RoundPage() {
 
     setScanning(true)
     try {
-      // Read image as data URL for Tesseract
       const dataUrl: string = await new Promise((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => resolve(reader.result as string)
@@ -182,21 +260,20 @@ export default function RoundPage() {
         reader.readAsDataURL(file)
       })
 
-      // Dynamic import keeps Tesseract out of SSR bundle
       const { createWorker } = await import('tesseract.js')
       const worker = await createWorker('eng')
       const { data: { text } } = await worker.recognize(dataUrl)
       await worker.terminate()
 
       const extracted = parseGolfGameBook(text)
-      const playerNames = players.map((p) => p.name)
+      const playerNames = players.map(p => p.name)
 
       const matched: Record<string, string> = {}
       let count = 0
       for (const { name, strokes } of extracted) {
         const playerName = matchScorecardName(name, playerNames)
         if (!playerName) continue
-        const player = players.find((p) => p.name === playerName)
+        const player = players.find(p => p.name === playerName)
         if (player && !matched[player.id]) {
           matched[player.id] = String(strokes)
           count++
@@ -206,7 +283,7 @@ export default function RoundPage() {
       if (count === 0) {
         toast.error('No scores matched — names on scorecard may differ from player list')
       } else {
-        setScores((prev) => ({ ...prev, ...matched }))
+        setScores(prev => ({ ...prev, ...matched }))
         toast.success(`Filled ${count} of ${players.length} scores from scorecard`)
       }
     } catch (err) {
@@ -215,14 +292,258 @@ export default function RoundPage() {
     setScanning(false)
   }
 
-  const isScored = savedScores.some((s) => s.strokes != null)
-  const sortedScores = [...savedScores].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
+  // ── Render ───────────────────────────────────────────────────────────────
 
-  if (!round) return (
+  if (!dataLoaded || !round) return (
     <div style={{ padding: 24, color: 'var(--ink-soft)', fontSize: 14, textAlign: 'center' }}>Loading…</div>
   )
 
   const roundDate = new Date(round.date + 'T12:00:00')
+  const dateLabel = roundDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()
+  const weekday = roundDate.toLocaleDateString('en-GB', { weekday: 'long' })
+
+  // ── Setup view (round has no players yet) ────────────────────────────────
+  if (players.length === 0) {
+    const setupPlayerList = allPlayers.filter(p => setupSelected.has(p.id))
+    const startDisabled = starting || setupSelected.size < 2
+
+    return (
+      <div style={{ background: 'var(--bunker-sand)', minHeight: '100%' }}>
+        {/* Header */}
+        <div style={{
+          padding: '16px',
+          background: 'var(--tour-navy-deep)',
+          borderBottom: '2px solid var(--trophy-gold)',
+        }}>
+          <button
+            onClick={() => router.push('/schedule')}
+            style={{
+              background: 'transparent', border: 0, color: '#B9C5D9',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+              fontFamily: 'var(--font-body)', fontWeight: 700,
+              fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
+              padding: 0, marginBottom: 12,
+            }}
+          >
+            <ChevronLeft size={16} strokeWidth={2} />
+            Schedule
+          </button>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 24,
+            textTransform: 'uppercase', letterSpacing: '.02em', color: '#F5EFE0',
+          }}>
+            {weekday}
+          </div>
+          <div style={{ fontSize: 13, color: '#B9C5D9', marginTop: 4 }}>
+            {dateLabel} · Select field · Randomize groups
+          </div>
+        </div>
+
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Player selection */}
+          <div style={{
+            background: '#fff',
+            border: '1px solid var(--bunker-sand-deep)',
+            borderRadius: 12,
+            boxShadow: 'var(--shadow-card)',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 14px',
+              borderBottom: '1px solid var(--bunker-sand-deep)',
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
+                textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--ink)',
+              }}>
+                Select Field
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  height: 20, padding: '0 8px', borderRadius: 999,
+                  fontSize: 10, fontWeight: 700, letterSpacing: '.08em',
+                  background: 'rgba(10,34,64,.10)', color: 'var(--ink-soft)',
+                  display: 'flex', alignItems: 'center',
+                }}>
+                  {setupSelected.size} selected
+                </span>
+                <button
+                  onClick={setupSelectAll}
+                  style={{
+                    height: 28, padding: '0 10px', borderRadius: 6,
+                    border: '1px solid var(--bunker-sand-deep)',
+                    background: 'transparent', color: 'var(--ink-soft)',
+                    fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 11,
+                    letterSpacing: '.06em', textTransform: 'uppercase', cursor: 'pointer',
+                  }}
+                >
+                  All
+                </button>
+              </div>
+            </div>
+
+            {allPlayers.length === 0 ? (
+              <div style={{ padding: '20px 14px', fontSize: 14, color: 'var(--ink-soft)' }}>
+                No players yet.{' '}
+                <a href="/players" style={{ color: 'var(--tour-navy)', fontWeight: 700, textDecoration: 'underline' }}>Add players first.</a>
+              </div>
+            ) : (
+              <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+                {allPlayers.map(p => {
+                  const on = setupSelected.has(p.id)
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => toggleSetupPlayer(p.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 10px', borderRadius: 8,
+                        border: `2px solid ${on ? 'var(--tour-navy)' : 'var(--bunker-sand-deep)'}`,
+                        background: on ? 'rgba(10,34,64,.06)' : '#fff',
+                        color: 'var(--ink)', cursor: 'pointer', textAlign: 'left',
+                      }}
+                    >
+                      <div style={{
+                        width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                        border: `2px solid ${on ? 'var(--tour-navy)' : '#ccc'}`,
+                        background: on ? 'var(--tour-navy)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {on && <span style={{ color: '#fff', fontSize: 10, lineHeight: 1 }}>✓</span>}
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.name}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Group randomizer */}
+          <div style={{
+            background: '#fff',
+            border: '1px solid var(--bunker-sand-deep)',
+            borderRadius: 12,
+            boxShadow: 'var(--shadow-card)',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              padding: '10px 14px',
+              borderBottom: '1px solid var(--bunker-sand-deep)',
+              fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 13,
+              textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--ink)',
+            }}>
+              Group Randomizer
+            </div>
+
+            <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-soft)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                  Per group:
+                </span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[2, 3, 4].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => { setSetupGroupSize(n); setSetupGroups([]) }}
+                      style={{
+                        width: 40, height: 40, borderRadius: 8, border: 0,
+                        background: setupGroupSize === n ? 'var(--tour-navy)' : 'var(--bunker-sand)',
+                        color: setupGroupSize === n ? '#F5EFE0' : 'var(--ink)',
+                        fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={doSetupRandomize}
+                style={{
+                  height: 44, borderRadius: 8, border: '1.5px solid var(--tour-navy)',
+                  background: 'transparent', color: 'var(--tour-navy)',
+                  fontFamily: 'var(--font-body)', fontWeight: 700,
+                  fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                <Shuffle size={16} strokeWidth={2} />
+                Randomize Groups
+              </button>
+
+              {setupGroups.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+                  {setupGroups.map((group, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        borderRadius: 8,
+                        border: '2px solid rgba(201,162,74,.40)',
+                        background: 'rgba(201,162,74,.06)',
+                        padding: 10,
+                      }}
+                    >
+                      <div style={{
+                        fontSize: 10, fontWeight: 700, letterSpacing: '.12em',
+                        textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 8,
+                      }}>
+                        Group {i + 1}
+                      </div>
+                      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        {group.map(pid => (
+                          <li key={pid} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Avatar initials={getInitials(nameOf(pid))} size={22} />
+                            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)' }}>{nameOf(pid)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {setupPlayerList.length > 0 && setupPlayerList.length % setupGroupSize !== 0 && (
+                <p style={{ fontSize: 12, color: 'var(--ink-faint)', margin: 0 }}>
+                  Note: {setupPlayerList.length} players doesn&apos;t divide evenly into groups of {setupGroupSize} — the last group will be smaller.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Start button */}
+          <button
+            onClick={startRound}
+            disabled={startDisabled}
+            style={{
+              height: 52, borderRadius: 10, border: 0,
+              background: startDisabled ? '#ccc' : 'var(--tournament-red)',
+              color: startDisabled ? '#999' : '#fff',
+              fontFamily: 'var(--font-body)', fontWeight: 700,
+              fontSize: 15, letterSpacing: '.06em', textTransform: 'uppercase',
+              cursor: startDisabled ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {starting ? 'Starting…' : `Start Round · ${setupSelected.size} players`}
+            {!starting && setupSelected.size >= 2 && <ChevronRight size={18} strokeWidth={2} />}
+          </button>
+
+        </div>
+      </div>
+    )
+  }
+
+  // ── Score entry view ─────────────────────────────────────────────────────
+
+  const isScored = savedScores.some(s => s.strokes != null)
+  const sortedScores = [...savedScores].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))
 
   return (
     <div style={{ background: 'var(--bunker-sand)', minHeight: '100%' }}>
@@ -250,7 +571,7 @@ export default function RoundPage() {
             fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15,
             textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0',
           }}>
-            {roundDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()}
+            {dateLabel}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -279,7 +600,7 @@ export default function RoundPage() {
         <section style={{ padding: '16px' }}>
           <div className="eyebrow" style={{ marginBottom: 10 }}>Pairings</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
-            {groups.map((g) => (
+            {groups.map(g => (
               <div
                 key={g.id}
                 style={{
@@ -296,7 +617,7 @@ export default function RoundPage() {
                   Group {g.group_number}
                 </div>
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {g.members.map((m) => (
+                  {g.members.map(m => (
                     <li key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Avatar initials={getInitials(m.name)} size={24} />
                       <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{m.name}</span>
@@ -318,7 +639,6 @@ export default function RoundPage() {
           boxShadow: 'var(--shadow-card)',
           overflow: 'hidden',
         }}>
-          {/* Section header */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '12px 14px',
@@ -367,7 +687,6 @@ export default function RoundPage() {
             </div>
           </div>
 
-          {/* Score rows */}
           {players.map((p, i) => (
             <div
               key={p.id}
@@ -385,7 +704,7 @@ export default function RoundPage() {
                 max={150}
                 placeholder="—"
                 value={scores[p.id] ?? ''}
-                onChange={(e) => session && setScores((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                onChange={e => session && setScores(prev => ({ ...prev, [p.id]: e.target.value }))}
                 readOnly={!session}
                 style={{
                   width: 72, height: 36, textAlign: 'center',
@@ -400,7 +719,6 @@ export default function RoundPage() {
             </div>
           ))}
 
-          {/* Save button */}
           {session && (
             <div style={{ padding: '12px 14px' }}>
               <button
@@ -425,10 +743,9 @@ export default function RoundPage() {
         </div>
       </section>
 
-      {/* Results — broadcast dark mode */}
+      {/* Results */}
       {isScored && sortedScores.length > 0 && (
         <section style={{ background: 'var(--tour-navy)', paddingBottom: 8 }}>
-          {/* Column header */}
           <div className="broadcast-header" style={{
             display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px',
             alignItems: 'center', height: 30, padding: '0 14px',
@@ -440,19 +757,19 @@ export default function RoundPage() {
           </div>
 
           {sortedScores.map((s, i) => {
-            const player = players.find((p) => p.id === s.player_id)
+            const player = players.find(p => p.id === s.player_id)
             const isFirst = s.rank === 1
             const isSecond = s.rank === 2
             const isThird = s.rank === 3
-            const rowBg = isFirst ? 'rgba(201,162,74,.15)' : 'transparent'
             return (
               <div
                 key={s.id}
                 style={{
                   display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px',
                   alignItems: 'center', height: 52, padding: '0 14px',
-                  background: rowBg, color: '#F5EFE0',
-                  borderBottom: '1px solid rgba(255,255,255,.06)',
+                  background: isFirst ? 'rgba(201,162,74,.15)' : 'transparent',
+                  color: '#F5EFE0',
+                  borderBottom: i < sortedScores.length - 1 ? '1px solid rgba(255,255,255,.06)' : 'none',
                 }}
               >
                 <span style={{

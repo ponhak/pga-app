@@ -3,9 +3,9 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { CalendarDays, ChevronRight, Plus, X, MapPin } from 'lucide-react'
+import { CalendarDays, ChevronRight, Plus, X, MapPin, Trash2 } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,6 +36,7 @@ const STATUS_STYLES: Record<Status, { bg: string; color: string; label: string }
 
 export default function SchedulePage() {
   const { session } = useAuth()
+  const router = useRouter()
   const [rounds, setRounds]     = useState<RoundEntry[]>([])
   const [loading, setLoading]   = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -74,6 +75,19 @@ export default function SchedulePage() {
       }))
     )
     setLoading(false)
+  }
+
+  async function handleDelete(roundId: string) {
+    if (!confirm('Remove this round from the schedule?')) return
+    const { data: groupIds } = await db.from('groups').select('id').eq('round_id', roundId)
+    if (groupIds?.length) {
+      await db.from('group_members').delete().in('group_id', groupIds.map((g: { id: string }) => g.id))
+      await db.from('groups').delete().eq('round_id', roundId)
+    }
+    await db.from('round_players').delete().eq('round_id', roundId)
+    await db.from('scores').delete().eq('round_id', roundId)
+    await db.from('rounds').delete().eq('id', roundId)
+    await load()
   }
 
   async function handleAdd(e: React.FormEvent) {
@@ -224,10 +238,10 @@ export default function SchedulePage() {
       ) : (
         <div>
           {upcoming.length > 0 && (
-            <Section label="Upcoming" rounds={upcoming} today={today} />
+            <Section label="Upcoming" rounds={upcoming} today={today} session={!!session} onDelete={handleDelete} onNavigate={id => router.push(`/rounds/${id}`)} />
           )}
           {past.length > 0 && (
-            <Section label="Past rounds" rounds={past} today={today} />
+            <Section label="Past rounds" rounds={past} today={today} session={!!session} onDelete={handleDelete} onNavigate={id => router.push(`/rounds/${id}`)} />
           )}
         </div>
       )}
@@ -235,7 +249,14 @@ export default function SchedulePage() {
   )
 }
 
-function Section({ label, rounds, today }: { label: string; rounds: RoundEntry[]; today: string }) {
+function Section({ label, rounds, today, session, onDelete, onNavigate }: {
+  label: string
+  rounds: RoundEntry[]
+  today: string
+  session: boolean
+  onDelete: (id: string) => void
+  onNavigate: (id: string) => void
+}) {
   return (
     <section style={{ padding: '20px 16px 8px' }}>
       <div style={{
@@ -255,15 +276,16 @@ function Section({ label, rounds, today }: { label: string; rounds: RoundEntry[]
           const status = getStatus(entry, today)
           const st = STATUS_STYLES[status]
           const d = new Date(entry.date + 'T12:00:00')
+          const canDelete = session && status !== 'scored'
           return (
-            <Link
+            <div
               key={entry.id}
-              href={`/rounds/${entry.id}`}
+              onClick={() => onNavigate(entry.id)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '14px 16px',
                 borderBottom: i < rounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
-                textDecoration: 'none',
+                cursor: 'pointer',
               }}
             >
               {/* Calendar block */}
@@ -311,8 +333,22 @@ function Section({ label, rounds, today }: { label: string; rounds: RoundEntry[]
                 {st.label}
               </span>
 
-              <ChevronRight size={16} color="var(--ink-faint)" strokeWidth={2} />
-            </Link>
+              {canDelete ? (
+                <button
+                  onClick={e => { e.stopPropagation(); onDelete(entry.id) }}
+                  title="Remove round"
+                  style={{
+                    flexShrink: 0, width: 30, height: 30, borderRadius: 6, border: 0,
+                    background: 'rgba(200,16,46,.08)', color: 'var(--tournament-red)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Trash2 size={14} strokeWidth={2} />
+                </button>
+              ) : (
+                <ChevronRight size={16} color="var(--ink-faint)" strokeWidth={2} />
+              )}
+            </div>
           )
         })}
       </div>
