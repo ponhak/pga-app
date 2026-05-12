@@ -258,13 +258,10 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div style={{ padding: '14px', fontSize: 11, color: '#8895AC', letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600, textAlign: 'center' }}>
-          Points: 1st = N pts · Last = 1 pt · Ties averaged
-        </div>
       </section>
 
       {/* ── Recent rounds ── */}
-      {recentRounds.length > 0 && (
+      {recentRounds.filter(r => r.hasScores).length > 0 && (
         <section style={{ padding: '20px 16px 24px', background: 'var(--bunker-sand)' }}>
           <div className="eyebrow" style={{ marginBottom: 12 }}>Recent rounds</div>
           <div
@@ -276,14 +273,14 @@ export default function DashboardPage() {
               overflow: 'hidden',
             }}
           >
-            {recentRounds.map(({ round, playerCount, hasScores }, i) => (
+            {recentRounds.filter(r => r.hasScores).map(({ round, playerCount, hasScores }, i, arr) => (
               <Link
                 key={round.id}
                 href={`/rounds/${round.id}`}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '14px 16px',
-                  borderBottom: i < recentRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
+                  borderBottom: i < arr.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
                   textDecoration: 'none',
                 }}
               >
