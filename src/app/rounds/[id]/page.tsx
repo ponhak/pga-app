@@ -25,65 +25,110 @@ const NICKNAMES: Record<string, string[]> = {
 }
 
 function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hcp: number | null; netDiff: number | null }[] {
-  const results: { name: string; strokes: number; hcp: number | null; netDiff: number | null }[] = []
   const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean)
 
-  const skipRe = /slagspel|poangbogey|resultat|spelat|leaderboard|spelinfo|spelflode|johannesberg|donald|steel|\bbook\b|\bgame\b/i
-  // Captures: [1] optional inline HCP digits, [2] net score (2-3 digits), [3] net +/- vs par
-  // Sign is optional on [3]: OCR sometimes drops the leading minus (e.g. "-1" becomes "1")
-  const scoreRe = /(?:HCP\s*(\d+)\s+)?(\d{2,3})\s+([+\-]?\d+)/i
-  // Standalone HCP line (e.g. "HCP 8" or "HCP8") — captures the value instead of discarding it
+  const skipRe      = /slagspel|poangbogey|resultat|spelat|leaderboard|spelinfo|spelflode|johannesberg|donald|steel|\bbook\b|\bgame\b/i
   const standaloneHcpRe = /^HCP\s*(\d+)$/i
-  const nameOnlyRe = /^[A-Za-zÅÄÖåäöÉéÜü\s\-]{3,}$/
+  const nameOnlyRe  = /^[A-Za-zÅÄÖåäöÉéÜü\s\-]{3,}$/
+  // With inline HCP: allow 1–3 digit strokes (HCP presence confirms it's a score line)
+  const scoreReHcp  = /HCP\s*(\d+)\s+(\d{1,3})\s+([+\-]?\d+)/i
+  // Without HCP: require 2–3 digit strokes to suppress false positives
+  const scoreReNoHcp = /(\d{2,3})\s+([+\-]?\d+)/i
 
-  let pendingName: string | null = null
-  let pendingHcp: number | null = null
+  // ── Pass 1: classify every line ──────────────────────────────────────────
+  interface NameEntry  { idx: number; text: string; claimed: boolean }
+  interface HcpEntry   { idx: number; val: number;  claimed: boolean }
+  interface ScoreEntry { idx: number; hcp: number | null; strokes: number; netDiff: number | null; line: string }
 
-  for (const line of lines) {
+  const nameEntries:  NameEntry[]  = []
+  const hcpEntries:   HcpEntry[]   = []
+  const scoreEntries: ScoreEntry[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
     if (/^#/.test(line) || skipRe.test(line)) continue
 
-    // Standalone HCP line — may appear before OR after the score line depending on GGB format
-    const hcpLineMatch = line.match(standaloneHcpRe)
-    if (hcpLineMatch) {
-      const hcpVal = Number(hcpLineMatch[1])
-      // Ruben-style: HCP line comes after the score was already pushed → backfill last result
-      if (results.length > 0 && results[results.length - 1].hcp === null) {
-        results[results.length - 1] = { ...results[results.length - 1], hcp: hcpVal }
-      } else {
-        // Normal: HCP line comes before the score line
-        pendingHcp = hcpVal
-      }
+    // HCP-only line
+    const hcpOnly = line.match(standaloneHcpRe)
+    if (hcpOnly) { hcpEntries.push({ idx: i, val: Number(hcpOnly[1]), claimed: false }); continue }
+
+    // Score line — try with inline HCP first (permissive strokes), then without
+    const mHcp = line.match(scoreReHcp)
+    if (mHcp) {
+      scoreEntries.push({ idx: i, hcp: Number(mHcp[1]), strokes: Number(mHcp[2]), netDiff: Number(mHcp[3]), line })
+      continue
+    }
+    const mNoHcp = line.match(scoreReNoHcp)
+    if (mNoHcp) {
+      scoreEntries.push({ idx: i, hcp: null, strokes: Number(mNoHcp[1]), netDiff: Number(mNoHcp[2]), line })
       continue
     }
 
-    const scoreMatch = line.match(scoreRe)
-    if (scoreMatch) {
-      // Prefer inline HCP from the score line; fall back to a preceding standalone HCP line
-      const hcp = scoreMatch[1] != null ? Number(scoreMatch[1]) : pendingHcp
-      const strokes = Number(scoreMatch[2])
-      const netDiff = scoreMatch[3] != null ? Number(scoreMatch[3]) : null
-      if (strokes >= 55 && strokes <= 160) {
-        let name = pendingName
-        if (!name) {
-          // Name on same line as score — strip rank prefix, HCPxx, and score onwards
-          name = line
-            .replace(/^\d+[.\)\s]\s*/, '')
-            .replace(/HCP\s*\d+/gi, '')
-            .replace(/\d{2,3}\s+[+\-]\d.*$/, '')
-            .replace(/\s+/g, ' ')
-            .trim()
-        }
-        if (name && name.length > 1) results.push({ name, strokes, hcp, netDiff })
-      }
-      pendingName = null
-      pendingHcp = null
-      continue
-    }
-
-    if (nameOnlyRe.test(line)) { pendingName = line; pendingHcp = null }
+    // Name-only line
+    if (nameOnlyRe.test(line)) nameEntries.push({ idx: i, text: line, claimed: false })
   }
 
-  return results
+  // ── Pass 2: pair each score with name + HCP ───────────────────────────────
+  const paired: { name: string; strokes: number; hcp: number | null; netDiff: number | null }[] = []
+
+  for (const score of scoreEntries) {
+    // Name: nearest unclaimed NAME line that appears before this score line
+    let name: string | null = null
+    let bestNameEntry: NameEntry | null = null
+    for (const n of nameEntries) {
+      if (n.claimed || n.idx >= score.idx) continue
+      if (!bestNameEntry || n.idx > bestNameEntry.idx) bestNameEntry = n
+    }
+    if (bestNameEntry) {
+      name = bestNameEntry.text
+      bestNameEntry.claimed = true
+    } else {
+      // Inline name: strip rank prefix, HCP token, and score-onwards from the line
+      name = score.line
+        .replace(/^\d+[.\)\s]\s*/, '')
+        .replace(/HCP\s*\d+/gi, '')
+        .replace(/\d{1,3}\s+[+\-]?\d+.*$/, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (!name || name.length < 2 || /\d/.test(name)) name = null
+    }
+
+    // HCP: inline on score line, or nearest unclaimed HCP entry within ±2 lines
+    let hcp = score.hcp
+    if (hcp == null) {
+      let bestHcp: HcpEntry | null = null
+      for (const h of hcpEntries) {
+        if (h.claimed || Math.abs(h.idx - score.idx) > 2) continue
+        if (!bestHcp || Math.abs(h.idx - score.idx) < Math.abs(bestHcp.idx - score.idx)) bestHcp = h
+      }
+      if (bestHcp) { hcp = bestHcp.val; bestHcp.claimed = true }
+    }
+
+    if (name) paired.push({ name, strokes: score.strokes, hcp, netDiff: score.netDiff })
+  }
+
+  // ── Pass 3: par inference — recover dropped-digit scores (e.g. 79 → 9) ──
+  // Infer par from the modal value of (strokes − netDiff) across valid results
+  const parVotes: Record<number, number> = {}
+  for (const r of paired) {
+    if (r.strokes >= 55 && r.strokes <= 160 && r.netDiff != null) {
+      const p = r.strokes - r.netDiff
+      parVotes[p] = (parVotes[p] ?? 0) + 1
+    }
+  }
+  const inferredPar = Object.keys(parVotes).length > 0
+    ? Number(Object.entries(parVotes).sort(([, a], [, b]) => b - a)[0][0])
+    : null
+
+  return paired
+    .map(r => {
+      if ((r.strokes < 55 || r.strokes > 160) && r.netDiff != null && inferredPar != null) {
+        const recovered = inferredPar + r.netDiff
+        if (recovered >= 55 && recovered <= 160) return { ...r, strokes: recovered }
+      }
+      return r
+    })
+    .filter(r => r.strokes >= 55 && r.strokes <= 160)
 }
 
 function matchScorecardName(scorecardName: string, playerNames: string[]): string | null {
