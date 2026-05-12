@@ -283,10 +283,11 @@ export default function RoundPage() {
       const playerNames = players.map(p => p.name)
 
       const matched: Record<string, string> = {}
+      const unmatched: string[] = []
       let count = 0
       for (const { name, strokes } of extracted) {
         const playerName = matchScorecardName(name, playerNames)
-        if (!playerName) continue
+        if (!playerName) { unmatched.push(`${name}(${strokes})`); continue }
         const player = players.find(p => p.name === playerName)
         if (player && !matched[player.id]) {
           matched[player.id] = String(strokes)
@@ -295,7 +296,7 @@ export default function RoundPage() {
       }
 
       if (count === 0) {
-        const found = extracted.map(e => e.name).join(', ')
+        const found = extracted.map(e => `${e.name}(${e.strokes})`).join(', ')
         const rawPreview = ocrLines.slice(0, 6).join(' / ')
         toast.error(
           found
@@ -305,7 +306,10 @@ export default function RoundPage() {
         )
       } else {
         setScores(prev => ({ ...prev, ...matched }))
-        toast.success(`Filled ${count} of ${players.length} scores from scorecard`)
+        const msg = unmatched.length
+          ? `Filled ${count}/${players.length}. Unmatched: ${unmatched.join(', ')}`
+          : `Filled ${count} of ${players.length} scores`
+        toast.success(msg, { duration: 8000 })
       }
     } catch (err) {
       toast.error('Scan failed: ' + (err instanceof Error ? err.message : String(err)))
