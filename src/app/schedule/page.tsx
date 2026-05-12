@@ -219,9 +219,9 @@ export default function SchedulePage() {
                     >
                       {isEditing ? <X size={14} strokeWidth={2.5} /> : <Pencil size={14} strokeWidth={2} />}
                     </button>
-                  ) : (
+                  ) : (session || status === 'scored') ? (
                     <ChevronRight size={16} color="var(--ink-faint)" strokeWidth={2} />
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Inline edit form */}
