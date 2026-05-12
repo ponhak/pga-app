@@ -24,12 +24,13 @@ const NICKNAMES: Record<string, string[]> = {
   nygren: ['niclas'],
 }
 
-function parseGolfGameBook(ocrText: string): { name: string; strokes: number }[] {
-  const results: { name: string; strokes: number }[] = []
+function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hcp: number | null; netDiff: number | null }[] {
+  const results: { name: string; strokes: number; hcp: number | null; netDiff: number | null }[] = []
   const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean)
 
   const skipRe = /slagspel|poangbogey|resultat|spelat|leaderboard|spelinfo|spelflode|johannesberg|donald|steel|\bbook\b|\bgame\b/i
-  const scoreRe = /(\d{2,3})\s+[+\-]\d/
+  // Captures: [1] optional HCP digits, [2] net score (2-3 digits), [3] net +/- vs par
+  const scoreRe = /(?:HCP(\d+)\s+)?(\d{2,3})\s+([+\-]\d+)/i
   const standaloneHcpRe = /^HCP\s+\d/i
   const nameOnlyRe = /^[A-Za-zÅÄÖåäöÉéÜü\s\-]{3,}$/
 
@@ -41,7 +42,9 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number }[]
 
     const scoreMatch = line.match(scoreRe)
     if (scoreMatch) {
-      const strokes = Number(scoreMatch[1])
+      const hcp = scoreMatch[1] != null ? Number(scoreMatch[1]) : null
+      const strokes = Number(scoreMatch[2])
+      const netDiff = scoreMatch[3] != null ? Number(scoreMatch[3]) : null
       if (strokes >= 55 && strokes <= 160) {
         let name = pendingName
         if (!name) {
@@ -53,7 +56,7 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number }[]
             .replace(/\s+/g, ' ')
             .trim()
         }
-        if (name && name.length > 1) results.push({ name, strokes })
+        if (name && name.length > 1) results.push({ name, strokes, hcp, netDiff })
       }
       pendingName = null
       continue
@@ -115,6 +118,8 @@ export default function RoundPage() {
   const [players, setPlayers] = useState<Player[]>([])
   const [groups, setGroups] = useState<GroupWithMembers[]>([])
   const [scores, setScores] = useState<Record<string, string>>({})
+  const [hcpData, setHcpData] = useState<Record<string, number>>({})
+  const [netDiffData, setNetDiffData] = useState<Record<string, number>>({})
   const [savedScores, setSavedScores] = useState<Score[]>([])
   const [saving, setSaving] = useState(false)
   const [scanning, setScanning] = useState(false)
@@ -303,14 +308,18 @@ export default function RoundPage() {
       const playerNames = players.map(p => p.name)
 
       const matched: Record<string, string> = {}
+      const matchedHcp: Record<string, number> = {}
+      const matchedNetDiff: Record<string, number> = {}
       const unmatched: string[] = []
       let count = 0
-      for (const { name, strokes } of extracted) {
+      for (const { name, strokes, hcp, netDiff } of extracted) {
         const playerName = matchScorecardName(name, playerNames)
         if (!playerName) { unmatched.push(`${name}(${strokes})`); continue }
         const player = players.find(p => p.name === playerName)
         if (player && !matched[player.id]) {
           matched[player.id] = String(strokes)
+          if (hcp != null) matchedHcp[player.id] = hcp
+          if (netDiff != null) matchedNetDiff[player.id] = netDiff
           count++
         } else if (!player) {
           unmatched.push(`${name}→${playerName}??(${strokes})`)
@@ -328,6 +337,8 @@ export default function RoundPage() {
         )
       } else {
         setScores(prev => ({ ...prev, ...matched }))
+        setHcpData(prev => ({ ...prev, ...matchedHcp }))
+        setNetDiffData(prev => ({ ...prev, ...matchedNetDiff }))
         const detail = unmatched.length ? ` | Unmatched: ${unmatched.join(', ')}` : ''
         toast.success(`Filled ${count}/${players.length} | ${extractedSummary}${detail}`, { duration: 15000 })
       }
@@ -693,7 +704,7 @@ export default function RoundPage() {
               fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14,
               textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--ink)',
             }}>
-              Scores (strokes)
+              Scores
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {isScored && (
@@ -732,37 +743,72 @@ export default function RoundPage() {
             </div>
           </div>
 
-          {players.map((p, i) => (
-            <div
-              key={p.id}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 14px',
-                borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
-              }}
-            >
-              <Avatar initials={getInitials(p.name)} size={28} />
-              <label style={{ flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</label>
-              <input
-                type="number"
-                min={30}
-                max={150}
-                placeholder="—"
-                value={scores[p.id] ?? ''}
-                onChange={e => session && setScores(prev => ({ ...prev, [p.id]: e.target.value }))}
-                readOnly={!session}
+          {/* Column header */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 48px 64px 48px',
+            padding: '4px 14px 4px',
+            borderBottom: '1px solid var(--bunker-sand-deep)',
+          }}>
+            {(['PLAYER', 'GROSS', 'NET', '+/−'] as const).map((label, i) => (
+              <span key={label} style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: '.10em',
+                textTransform: 'uppercase', color: 'var(--ink-faint)',
+                textAlign: i === 0 ? 'left' : 'right',
+              }}>{label}</span>
+            ))}
+          </div>
+
+          {players.map((p, i) => {
+            const net = scores[p.id] ? Number(scores[p.id]) : null
+            const hcp = hcpData[p.id] ?? null
+            const gross = net != null && hcp != null ? net + hcp : null
+            const netDiff = netDiffData[p.id] ?? null
+            return (
+              <div
+                key={p.id}
                 style={{
-                  width: 72, height: 36, textAlign: 'center',
-                  borderRadius: 6, border: '1.5px solid var(--bunker-sand-deep)',
-                  background: scores[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)',
-                  color: scores[p.id] ? '#F5EFE0' : 'var(--ink)',
-                  fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 15,
-                  outline: 'none', boxSizing: 'border-box',
-                  cursor: session ? 'auto' : 'default',
+                  display: 'grid', gridTemplateColumns: '1fr 48px 64px 48px',
+                  alignItems: 'center',
+                  padding: '8px 14px',
+                  borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
                 }}
-              />
-            </div>
-          ))}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <Avatar initials={getInitials(p.name)} size={28} />
+                  <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                </div>
+                <div style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--ink-soft)' }}>
+                  {gross ?? '—'}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <input
+                    type="number"
+                    min={30}
+                    max={150}
+                    placeholder="—"
+                    value={scores[p.id] ?? ''}
+                    onChange={e => session && setScores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                    readOnly={!session}
+                    style={{
+                      width: 56, height: 34, textAlign: 'center',
+                      borderRadius: 6, border: '1.5px solid var(--bunker-sand-deep)',
+                      background: scores[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)',
+                      color: scores[p.id] ? '#F5EFE0' : 'var(--ink)',
+                      fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 15,
+                      outline: 'none', boxSizing: 'border-box',
+                      cursor: session ? 'auto' : 'default',
+                    }}
+                  />
+                </div>
+                <div style={{
+                  textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700,
+                  color: netDiff == null ? 'var(--ink-faint)' : netDiff < 0 ? 'var(--fairway-green)' : netDiff === 0 ? 'var(--ink-soft)' : 'var(--tournament-red)',
+                }}>
+                  {netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—'}
+                </div>
+              </div>
+            )
+          })}
 
           {session && (
             <div style={{ padding: '12px 14px' }}>
