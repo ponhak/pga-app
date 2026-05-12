@@ -17,9 +17,19 @@ export interface Database {
         Update: { id?: string; name?: string; created_at?: string }
       }
       rounds: {
-        Row: { id: string; date: string; group_size: number; notes: string | null; tee_time: string | null; created_at: string }
-        Insert: { id?: string; date?: string; group_size: number; notes?: string | null; tee_time?: string | null; created_at?: string }
-        Update: { id?: string; date?: string; group_size?: number; notes?: string | null; tee_time?: string | null; created_at?: string }
+        Row: { id: string; date: string; group_size: number; notes: string | null; tee_time: string | null; double_points: boolean; created_at: string }
+        Insert: { id?: string; date?: string; group_size: number; notes?: string | null; tee_time?: string | null; double_points?: boolean; created_at?: string }
+        Update: { id?: string; date?: string; group_size?: number; notes?: string | null; tee_time?: string | null; double_points?: boolean; created_at?: string }
+      }
+      season_plans: {
+        Row: { id: string; year: number; max_field_size: number; total_rounds: number; status: string; created_at: string }
+        Insert: { id?: string; year: number; max_field_size: number; total_rounds: number; status?: string; created_at?: string }
+        Update: { id?: string; year?: number; max_field_size?: number; total_rounds?: number; status?: string; created_at?: string }
+      }
+      season_plan_rounds: {
+        Row: { id: string; plan_id: string; round_number: number; name: string; date: string | null; double_points: boolean }
+        Insert: { id?: string; plan_id: string; round_number: number; name?: string; date?: string | null; double_points?: boolean }
+        Update: { id?: string; plan_id?: string; round_number?: number; name?: string; date?: string | null; double_points?: boolean }
       }
       round_players: {
         Row: { round_id: string; player_id: string }

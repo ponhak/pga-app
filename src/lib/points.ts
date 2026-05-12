@@ -9,7 +9,7 @@ export interface ScoreResult extends ScoreInput {
   points: number
 }
 
-export function assignPoints(scores: ScoreInput[]): ScoreResult[] {
+export function assignPoints(scores: ScoreInput[], multiplier = 1): ScoreResult[] {
   const n = scores.length
   const sorted = [...scores].sort((a, b) => {
     if (a.strokes !== b.strokes) return a.strokes - b.strokes
@@ -32,7 +32,7 @@ export function assignPoints(scores: ScoreInput[]): ScoreResult[] {
     while (j < sorted.length && areTied(sorted[i], sorted[j])) j++
     const tiedCount = j - i
     const totalPoints = Array.from({ length: tiedCount }, (_, k) => n - i - k).reduce((a, b) => a + b, 0)
-    const avgPoints = totalPoints / tiedCount
+    const avgPoints = (totalPoints / tiedCount) * multiplier
     for (let k = i; k < j; k++) {
       results.push({ ...sorted[k], rank: i + 1, points: avgPoints })
     }

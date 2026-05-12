@@ -16,6 +16,7 @@ interface RoundEntry {
   date: string
   group_size: number
   notes: string | null
+  double_points: boolean
   playerCount: number
   hasScores: boolean
 }
@@ -52,7 +53,7 @@ export default function SchedulePage() {
 
   async function load() {
     const [{ data: roundsData }, { data: rpData }, { data: scoresData }] = await Promise.all([
-      db.from('rounds').select('id, date, group_size, notes').order('date', { ascending: false }),
+      db.from('rounds').select('id, date, group_size, notes, double_points').order('date', { ascending: false }),
       db.from('round_players').select('round_id, player_id'),
       db.from('scores').select('round_id, strokes'),
     ])
@@ -68,8 +69,9 @@ export default function SchedulePage() {
     })
 
     setRounds(
-      (roundsData ?? []).map((r: { id: string; date: string; group_size: number; notes: string | null }) => ({
+      (roundsData ?? []).map((r: { id: string; date: string; group_size: number; notes: string | null; double_points: boolean }) => ({
         ...r,
+        double_points: r.double_points ?? false,
         playerCount: rpCount[r.id] ?? 0,
         hasScores: hasScoresMap[r.id] ?? false,
       }))
@@ -327,6 +329,19 @@ function Section({ label, rounds, today, session, onDelete, onNavigate }: {
                   </div>
                 )}
               </div>
+
+              {/* Double points badge */}
+              {entry.double_points && (
+                <span style={{
+                  flexShrink: 0,
+                  height: 22, padding: '0 8px', borderRadius: 999,
+                  fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase',
+                  background: 'rgba(201,162,74,.22)', color: 'var(--trophy-gold)',
+                  display: 'flex', alignItems: 'center',
+                }}>
+                  2×
+                </span>
+              )}
 
               {/* Status pill */}
               <span style={{

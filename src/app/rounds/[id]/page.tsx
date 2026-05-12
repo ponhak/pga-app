@@ -312,7 +312,7 @@ export default function RoundPage() {
 
     setSaving(true)
     try {
-      const results = assignPoints(entries)
+      const results = assignPoints(entries, round?.double_points ? 2 : 1)
       const upserts = results.map(r => ({
         round_id: id,
         player_id: r.playerId,
