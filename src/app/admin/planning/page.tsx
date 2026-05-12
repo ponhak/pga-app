@@ -41,6 +41,9 @@ export default function PlanningPage() {
   const [planId, setPlanId]           = useState<string | null>(null)
   const [maxFieldSize, setMaxFieldSize] = useState(8)
   const [totalRounds, setTotalRounds]   = useState(8)
+  // Separate string states so inputs can be cleared while typing
+  const [maxFieldInput, setMaxFieldInput]       = useState('8')
+  const [totalRoundsInput, setTotalRoundsInput] = useState('8')
   const [planRounds, setPlanRounds]     = useState<PlanRound[]>([])
   const [pendingDeletions, setPendingDeletions] = useState<string[]>([]) // linked_round_ids to cascade-delete on save
   const [saving, setSaving]   = useState(false)
@@ -68,7 +71,9 @@ export default function PlanningPage() {
     if (plan) {
       setPlanId(plan.id)
       setMaxFieldSize(plan.max_field_size)
+      setMaxFieldInput(String(plan.max_field_size))
       setTotalRounds(plan.total_rounds)
+      setTotalRoundsInput(String(plan.total_rounds))
 
       const { data: pr } = await db
         .from('season_plan_rounds')
@@ -91,7 +96,9 @@ export default function PlanningPage() {
     } else {
       setPlanId(null)
       setMaxFieldSize(8)
+      setMaxFieldInput('8')
       setTotalRounds(8)
+      setTotalRoundsInput('8')
       setPlanRounds(Array.from({ length: 8 }, (_, i) => ({
         round_number: i + 1, name: '', date: '', double_points: false, linked_round_id: null,
       })))
@@ -118,7 +125,19 @@ export default function PlanningPage() {
   }
 
   function updateRound(index: number, updates: Partial<PlanRound>) {
-    setPlanRounds(prev => prev.map((r, i) => i === index ? { ...r, ...updates } : r))
+    setPlanRounds(prev => {
+      const updated = prev.map((r, i) => i === index ? { ...r, ...updates } : r)
+      if (!('date' in updates)) return updated
+      // Re-sort by date when a date changes; undated rounds go to the end
+      return [...updated]
+        .sort((a, b) => {
+          if (!a.date && !b.date) return 0
+          if (!a.date) return 1
+          if (!b.date) return -1
+          return a.date.localeCompare(b.date)
+        })
+        .map((r, i) => ({ ...r, round_number: i + 1 }))
+    })
   }
 
   function removeRound(index: number) {
@@ -131,7 +150,7 @@ export default function PlanningPage() {
         .filter((_, i) => i !== index)
         .map((r, i) => ({ ...r, round_number: i + 1 }))
     })
-    setTotalRounds(n => n - 1)
+    setTotalRounds(n => { const next = n - 1; setTotalRoundsInput(String(next)); return next })
   }
 
   // Cascade-delete a schedule round and all its related data
@@ -349,8 +368,13 @@ export default function PlanningPage() {
                   </label>
                   <input
                     type="number" min={2} max={60}
-                    value={maxFieldSize}
-                    onChange={e => setMaxFieldSize(parseInt(e.target.value) || 8)}
+                    value={maxFieldInput}
+                    onChange={e => setMaxFieldInput(e.target.value)}
+                    onBlur={e => {
+                      const n = Math.max(2, Math.min(60, parseInt(e.target.value) || 8))
+                      setMaxFieldSize(n)
+                      setMaxFieldInput(String(n))
+                    }}
                     style={{ ...inputStyle(), width: '100%' }}
                   />
                 </div>
@@ -360,8 +384,13 @@ export default function PlanningPage() {
                   </label>
                   <input
                     type="number" min={1} max={20}
-                    value={totalRounds}
-                    onChange={e => handleTotalRoundsChange(parseInt(e.target.value) || 1)}
+                    value={totalRoundsInput}
+                    onChange={e => setTotalRoundsInput(e.target.value)}
+                    onBlur={e => {
+                      const n = Math.max(1, Math.min(20, parseInt(e.target.value) || 1))
+                      handleTotalRoundsChange(n)
+                      setTotalRoundsInput(String(n))
+                    }}
                     style={{ ...inputStyle(), width: '100%' }}
                   />
                 </div>
