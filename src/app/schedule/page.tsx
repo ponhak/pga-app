@@ -147,7 +147,7 @@ export default function SchedulePage() {
               >
                 {/* Card row */}
                 <div
-                  onClick={() => router.push(`/rounds/${entry.id}`)}
+                  onClick={() => { if (!session && status === 'upcoming') return; router.push(`/rounds/${entry.id}`) }}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer' }}
                 >
                   {/* Calendar block */}
