@@ -30,11 +30,14 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number }[]
     const line = raw.trim()
     if (!line) continue
     if (/^hcp\s/i.test(line) || /handicaprond/i.test(line)) continue
-    const m = line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]+?)\s{2,}(\d{2,3})\s+[+\-]\d/)
-      ?? line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]+?)\s+(\d{2,3})\s+[+\-]\d/)
+    // Try patterns from most to least specific
+    const m = line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]+?)\s{2,}(\d{2,3})\s+[+\-]/)
+      ?? line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]+?)\s+(\d{2,3})\s+[+\-]/)
+      ?? line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]{4,}?)\s{2,}(\d{2,3})(?:\s|$)/)
+      ?? line.match(/^(?:\d+[\.\)]\s+)?([A-Za-zÅÄÖåäöÉéÜü\s\-]{4,}?)\s+(\d{2,3})(?:\s|$)/)
     if (!m) continue
     const strokes = Number(m[2])
-    if (strokes < 60 || strokes > 150) continue
+    if (strokes < 55 || strokes > 160) continue
     results.push({ name: m[1].trim(), strokes })
   }
   return results
@@ -272,6 +275,8 @@ export default function RoundPage() {
       await worker.terminate()
 
       const extracted = parseGolfGameBook(text)
+      // Debug: keep raw OCR lines for error reporting
+      const ocrLines = text.split('\n').map(l => l.trim()).filter(Boolean)
       const playerNames = players.map(p => p.name)
 
       const matched: Record<string, string> = {}
@@ -288,9 +293,12 @@ export default function RoundPage() {
 
       if (count === 0) {
         const found = extracted.map(e => e.name).join(', ')
+        const rawPreview = ocrLines.slice(0, 6).join(' / ')
         toast.error(
-          found ? `No names matched. Scorecard had: ${found}` : 'No scores found — check image quality',
-          { duration: 8000 }
+          found
+            ? `No names matched. Extracted: ${found}`
+            : `Nothing parsed. OCR read: "${rawPreview}"`,
+          { duration: 12000 }
         )
       } else {
         setScores(prev => ({ ...prev, ...matched }))
