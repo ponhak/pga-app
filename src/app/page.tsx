@@ -100,7 +100,11 @@ export default function DashboardPage() {
     })
 
     const sorted = Object.values(standingMap)
-      .sort((a, b) => b.totalPoints - a.totalPoints || a.player.name.localeCompare(b.player.name))
+      .sort((a, b) =>
+        b.totalPoints - a.totalPoints ||
+        (a.player.hcp ?? 999) - (b.player.hcp ?? 999) ||
+        a.player.name.localeCompare(b.player.name)
+      )
     setStandings(sorted)
 
     const rpByRound: Record<string, number> = {}
