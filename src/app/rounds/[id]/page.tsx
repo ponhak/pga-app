@@ -41,9 +41,19 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
   for (const line of lines) {
     if (/^#/.test(line) || skipRe.test(line)) continue
 
-    // Standalone HCP line — store value, keep pendingName intact
+    // Standalone HCP line — may appear before OR after the score line depending on GGB format
     const hcpLineMatch = line.match(standaloneHcpRe)
-    if (hcpLineMatch) { pendingHcp = Number(hcpLineMatch[1]); continue }
+    if (hcpLineMatch) {
+      const hcpVal = Number(hcpLineMatch[1])
+      // Ruben-style: HCP line comes after the score was already pushed → backfill last result
+      if (results.length > 0 && results[results.length - 1].hcp === null) {
+        results[results.length - 1] = { ...results[results.length - 1], hcp: hcpVal }
+      } else {
+        // Normal: HCP line comes before the score line
+        pendingHcp = hcpVal
+      }
+      continue
+    }
 
     const scoreMatch = line.match(scoreRe)
     if (scoreMatch) {
