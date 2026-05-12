@@ -58,18 +58,27 @@ export default function DashboardPage() {
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const [{ data: players }, { data: scores }, { data: rounds }, { data: roundPlayers }] =
+    const currentYear = new Date().getFullYear()
+    const yearStart = `${currentYear}-01-01`
+    const yearEnd   = `${currentYear}-12-31`
+
+    const [{ data: players }, { data: rounds }, { data: roundPlayers }] =
       await Promise.all([
         db.from('players').select('*'),
-        db.from('scores').select('*'),
-        db.from('rounds').select('*').order('date', { ascending: false }).limit(5),
+        db.from('rounds').select('*').gte('date', yearStart).lte('date', yearEnd).order('date', { ascending: false }),
         db.from('round_players').select('round_id, player_id'),
       ])
 
     const typedPlayers = (players as Player[]) ?? []
+    const typedRounds  = (rounds as Round[]) ?? []
+    const typedRP      = (roundPlayers as { round_id: string; player_id: string }[]) ?? []
+
+    const roundIds = typedRounds.map(r => r.id)
+    const { data: scores } = roundIds.length > 0
+      ? await db.from('scores').select('*').in('round_id', roundIds)
+      : { data: [] }
+
     const typedScores = (scores as Score[]) ?? []
-    const typedRounds = (rounds as Round[]) ?? []
-    const typedRP = (roundPlayers as { round_id: string; player_id: string }[]) ?? []
 
     const standingMap: Record<string, Standing> = {}
     typedPlayers.forEach((p) => {
@@ -109,7 +118,8 @@ export default function DashboardPage() {
   }
 
   const leader = standings[0]
-  const hasData = standings.some(s => s.totalPoints > 0)
+  const hasData    = standings.some(s => s.totalPoints > 0)
+  const hasStarted = hasData
 
   return (
     <div>
@@ -128,10 +138,11 @@ export default function DashboardPage() {
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 height: 28, padding: '0 12px', borderRadius: 999,
                 fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase',
-                background: 'var(--tournament-red)', color: '#fff',
+                background: hasStarted ? 'var(--tournament-red)' : 'rgba(255,255,255,.10)',
+                color: '#fff',
               }}>
-                <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />
-                Season Live
+                {hasStarted && <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />}
+                {hasStarted ? 'Season Live' : 'Pre-Season'}
               </span>
               <span style={{ fontSize: 11, letterSpacing: '.12em', color: '#B9C5D9', fontWeight: 700, textTransform: 'uppercase' }}>
                 {new Date().getFullYear()}
@@ -179,10 +190,16 @@ export default function DashboardPage() {
           <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0' }}>
             Leaderboard
           </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 22, padding: '0 9px', borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', background: 'var(--tournament-red)', color: '#fff' }}>
-            <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />
-            Live
-          </span>
+          {hasStarted ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 22, padding: '0 9px', borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', background: 'var(--tournament-red)', color: '#fff' }}>
+              <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />
+              Live
+            </span>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 9px', borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', background: 'rgba(255,255,255,.08)', color: '#8895AC' }}>
+              Not started
+            </span>
+          )}
         </div>
 
         {/* Column header */}
