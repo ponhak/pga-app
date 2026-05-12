@@ -155,7 +155,7 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
       {/* CTA buttons */}
       <div style={{ display: 'flex', gap: 10, padding: '0 14px 14px' }}>
         <Link
-          href={`/rounds/${round.id}`}
+          href="/schedule"
           style={{
             flex: 1, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'var(--tournament-red)', color: '#fff',
@@ -163,10 +163,10 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
             textTransform: 'uppercase', textDecoration: 'none',
           }}
         >
-          Set Up Round
+          View Schedule
         </Link>
         <Link
-          href="/"
+          href="/schedule"
           style={{
             flex: 1, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'transparent', color: '#F5EFE0',
@@ -175,7 +175,7 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
             textTransform: 'uppercase', textDecoration: 'none',
           }}
         >
-          Leaderboard
+          Past Rounds
         </Link>
       </div>
 
