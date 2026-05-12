@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import { toast } from 'sonner'
 import { ShieldCheck, ChevronLeft, Plus, ChevronRight, Pencil, Trash2, X, Check } from 'lucide-react'
-import type { Round, Player } from '@/lib/database.types'
+import type { Round, Player, Score } from '@/lib/database.types'
 import { assignPoints } from '@/lib/points'
 import Link from 'next/link'
 
@@ -43,10 +43,13 @@ export default function ManageDataPage() {
   const [loadingData, setLoadingData] = useState(true)
 
   // Inline edit for current-year rounds
-  const [editId, setEditId]       = useState<string | null>(null)
-  const [editDate, setEditDate]   = useState('')
-  const [editVenue, setEditVenue] = useState('')
-  const [editSaving, setEditSaving] = useState(false)
+  const [editId, setEditId]             = useState<string | null>(null)
+  const [editDate, setEditDate]         = useState('')
+  const [editVenue, setEditVenue]       = useState('')
+  const [editSaving, setEditSaving]     = useState(false)
+  const [editRoundPlayers, setEditRoundPlayers] = useState<Player[]>([])
+  const [editRoundScores, setEditRoundScores]   = useState<Record<string, string>>({})
+  const [editScoreSaving, setEditScoreSaving]   = useState(false)
 
   // Historical round form
   const [showHist, setShowHist]   = useState(false)
@@ -93,10 +96,54 @@ export default function ManageDataPage() {
 
   // ── Edit current-year round metadata ──────────────────────────────────────
 
-  function startEdit(r: RoundRow) {
+  async function startEdit(r: RoundRow) {
     setEditId(r.id)
     setEditDate(r.date)
     setEditVenue(r.notes ?? '')
+    setEditRoundPlayers([])
+    setEditRoundScores({})
+
+    const [{ data: rpData }, { data: scoreData }] = await Promise.all([
+      db.from('round_players').select('player_id, players(*)').eq('round_id', r.id),
+      db.from('scores').select('*').eq('round_id', r.id),
+    ])
+    const rp = (rpData as { player_id: string; players: Player }[]) ?? []
+    setEditRoundPlayers(rp.map(x => x.players).sort((a, b) => a.name.localeCompare(b.name)))
+
+    const sc: Record<string, string> = {}
+    for (const s of (scoreData as Score[]) ?? []) {
+      if (s.strokes != null) sc[s.player_id] = String(s.strokes)
+    }
+    setEditRoundScores(sc)
+  }
+
+  async function saveEditScores() {
+    if (!editId) return
+    const entries = editRoundPlayers
+      .filter(p => editRoundScores[p.id]?.trim() !== '' && editRoundScores[p.id] != null)
+      .map(p => ({ playerId: p.id, strokes: parseInt(editRoundScores[p.id]) }))
+      .filter(s => !isNaN(s.strokes) && s.strokes > 0)
+
+    if (entries.length < 2) { toast.error('Enter at least 2 net scores'); return }
+
+    setEditScoreSaving(true)
+    const results = assignPoints(entries)
+    const upserts = results.map(r => ({
+      round_id:      editId,
+      player_id:     r.playerId,
+      strokes:       r.strokes,
+      points_earned: r.points,
+      rank:          r.rank,
+    }))
+    const { error } = await db.from('scores').upsert(upserts, { onConflict: 'round_id,player_id' })
+    if (error) {
+      toast.error(error.message)
+    } else {
+      toast.success('Scores updated')
+      setEditId(null)
+      await loadAll()
+    }
+    setEditScoreSaving(false)
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -281,33 +328,60 @@ export default function ManageDataPage() {
                 <div key={r.id} style={{ borderBottom: i < currRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}>
                   {editId === r.id ? (
                     /* Inline edit form */
-                    <form onSubmit={saveEdit} style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Edit Round</span>
                         <button type="button" onClick={() => setEditId(null)} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-faint)', padding: 4 }}>
                           <X size={16} strokeWidth={2} />
                         </button>
                       </div>
-                      <div>
-                        <label style={label()}>Date</label>
-                        <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)}
-                          min={currYearStart} max={today} required style={textInput()} />
-                      </div>
-                      <div>
-                        <label style={label()}>Venue</label>
-                        <input type="text" value={editVenue} onChange={e => setEditVenue(e.target.value)}
-                          placeholder="e.g. Schager GK" style={textInput()} />
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
+
+                      {/* Details section */}
+                      <form onSubmit={saveEdit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Round Details</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <div>
+                            <label style={label({ fontSize: 10 })}>Date</label>
+                            <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)}
+                              min={currYearStart} max={today} required style={textInput({ height: 40, fontSize: 14 })} />
+                          </div>
+                          <div>
+                            <label style={label({ fontSize: 10 })}>Venue</label>
+                            <input type="text" value={editVenue} onChange={e => setEditVenue(e.target.value)}
+                              placeholder="e.g. Schager GK" style={textInput({ height: 40, fontSize: 14 })} />
+                          </div>
+                        </div>
                         <button type="submit" disabled={editSaving}
-                          style={{ flex: 1, height: 40, borderRadius: 8, border: 0, background: editSaving ? '#ccc' : 'var(--tour-navy)', color: '#F5EFE0', fontWeight: 700, fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase', cursor: editSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                          <Check size={15} strokeWidth={2.5} /> {editSaving ? 'Saving…' : 'Save'}
+                          style={{ height: 38, borderRadius: 8, border: 0, background: editSaving ? '#ccc' : 'var(--tour-navy)', color: '#F5EFE0', fontWeight: 700, fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase', cursor: editSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          <Check size={14} strokeWidth={2.5} /> {editSaving ? 'Saving…' : 'Save Details'}
                         </button>
-                        <Link href={`/rounds/${r.id}`} style={{ flex: 1, height: 40, borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontWeight: 700, fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
-                          Edit Scores
-                        </Link>
-                      </div>
-                    </form>
+                      </form>
+
+                      {/* Scores section */}
+                      {editRoundPlayers.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div style={{ height: 1, background: 'var(--bunker-sand-deep)' }} />
+                          <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Net Scores</label>
+                          {editRoundPlayers.map(p => (
+                            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
+                              <input
+                                type="number" min={40} max={130}
+                                value={editRoundScores[p.id] ?? ''}
+                                onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                placeholder="—"
+                                style={{ width: 72, height: 38, padding: '0 10px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 15, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
+                              />
+                            </div>
+                          ))}
+                          <button onClick={saveEditScores} disabled={editScoreSaving}
+                            style={{ height: 38, borderRadius: 8, border: 0, background: editScoreSaving ? '#ccc' : 'var(--fairway-green)', color: '#fff', fontWeight: 700, fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase', cursor: editScoreSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <Check size={14} strokeWidth={2.5} /> {editScoreSaving ? 'Saving…' : 'Save & Recalculate Points'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     /* Normal row */
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px' }}>

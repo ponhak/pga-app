@@ -317,6 +317,8 @@ export default function RoundPage() {
         round_id: id,
         player_id: r.playerId,
         strokes: r.strokes,
+        gross_strokes: r.grossStrokes ?? null,
+        net_diff: netDiffData[r.playerId] ?? null,
         points_earned: r.points,
         rank: r.rank,
       }))
@@ -822,221 +824,123 @@ export default function RoundPage() {
         </section>
       )}
 
-      {/* Score entry */}
+      {/* Score card — locked when scored, editable when pending */}
       <section style={{ padding: '0 16px 16px' }}>
-        <div style={{
-          background: '#fff',
-          border: '1px solid var(--bunker-sand-deep)',
-          borderRadius: 12,
-          boxShadow: 'var(--shadow-card)',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 14px',
-            borderBottom: '1px solid var(--bunker-sand-deep)',
-          }}>
-            <span style={{
-              fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14,
-              textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--ink)',
-            }}>
+        <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
+
+          {/* Card header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid var(--bunker-sand-deep)' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--ink)' }}>
               Scores
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {isScored && (
-                <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>Edit and save to update</span>
-              )}
-              {session && (
-                <>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={scanning}
-                    title="Scan scorecard photo"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      height: 30, padding: '0 10px', borderRadius: 6, border: 0,
-                      background: scanning ? 'rgba(10,34,64,.06)' : 'var(--tour-navy)',
-                      color: scanning ? 'var(--ink-soft)' : '#F5EFE0',
-                      fontWeight: 700, fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase',
-                      cursor: scanning ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {scanning
-                      ? <><Loader2 size={13} strokeWidth={2.5} style={{ animation: 'spin 1s linear infinite' }} /> Scanning…</>
-                      : <><ScanLine size={13} strokeWidth={2.5} /> Scan Card</>
-                    }
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={handleScanUpload}
-                  />
-                </>
-              )}
-            </div>
+            {isScored ? (
+              <span style={{ height: 22, padding: '0 9px', borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', background: 'rgba(31,122,76,.14)', color: 'var(--fairway-green)', display: 'flex', alignItems: 'center' }}>
+                Final
+              </span>
+            ) : session ? (
+              <>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={scanning}
+                  title="Scan scorecard photo"
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, height: 30, padding: '0 10px', borderRadius: 6, border: 0, background: scanning ? 'rgba(10,34,64,.06)' : 'var(--tour-navy)', color: scanning ? 'var(--ink-soft)' : '#F5EFE0', fontWeight: 700, fontSize: 11, letterSpacing: '.08em', textTransform: 'uppercase', cursor: scanning ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {scanning
+                    ? <><Loader2 size={13} strokeWidth={2.5} style={{ animation: 'spin 1s linear infinite' }} /> Scanning…</>
+                    : <><ScanLine size={13} strokeWidth={2.5} /> Scan Card</>}
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleScanUpload} />
+              </>
+            ) : null}
           </div>
 
-          {/* Column header */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px',
-            padding: '5px 14px',
-            background: 'var(--bunker-sand)',
-            borderBottom: '1px solid var(--bunker-sand-deep)',
-          }}>
-            {(['PLAYER', 'GROSS', 'NET', '+/−'] as const).map((label, i) => (
-              <span key={label} style={{
-                fontSize: 9, fontWeight: 700, letterSpacing: '.12em',
-                textTransform: 'uppercase', color: 'var(--ink-soft)',
-                textAlign: i === 0 ? 'left' : 'center',
-              }}>{label}</span>
-            ))}
-          </div>
-
-          {players.map((p, i) => {
-            const net = scores[p.id] ? Number(scores[p.id]) : null
-            const hcp = hcpData[p.id] ?? null
-            const gross = net != null && hcp != null ? net + hcp : null
-            const netDiff = netDiffData[p.id] ?? null
-            const diffColor = netDiff == null
-              ? 'var(--ink-faint)'
-              : netDiff < 0
-                ? 'var(--tournament-red)'
-                : 'var(--ink)'
-            return (
-              <div
-                key={p.id}
-                style={{
-                  display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px',
-                  alignItems: 'center',
-                  padding: '9px 14px',
-                  borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                  <Avatar initials={getInitials(p.name)} size={28} />
-                  <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-                </div>
-                <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 15, color: gross != null ? 'var(--ink-soft)' : 'var(--ink-faint)' }}>
-                  {gross ?? '—'}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <input
-                    type="number"
-                    min={30}
-                    max={150}
-                    placeholder="—"
-                    value={scores[p.id] ?? ''}
-                    onChange={e => session && setScores(prev => ({ ...prev, [p.id]: e.target.value }))}
-                    readOnly={!session}
-                    style={{
-                      width: 52, height: 34, textAlign: 'center',
-                      borderRadius: 6, border: '1.5px solid var(--bunker-sand-deep)',
-                      background: scores[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)',
-                      color: scores[p.id] ? '#F5EFE0' : 'var(--ink)',
-                      fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 15,
-                      outline: 'none', boxSizing: 'border-box',
-                      cursor: session ? 'auto' : 'default',
-                    }}
-                  />
-                </div>
-                <div style={{
-                  textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
-                  color: diffColor,
-                }}>
-                  {netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—'}
-                </div>
+          {isScored ? (
+            <>
+              {/* Locked column header */}
+              <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 52px 48px 52px 54px', padding: '5px 14px', background: 'var(--bunker-sand)', borderBottom: '1px solid var(--bunker-sand-deep)' }}>
+                {(['POS', 'PLAYER', 'GROSS', 'NET', '+/−', 'PTS'] as const).map((col, i) => (
+                  <span key={col} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: i < 2 ? 'left' : 'center' }}>{col}</span>
+                ))}
               </div>
-            )
-          })}
 
-          {session && (
-            <div style={{ padding: '12px 14px' }}>
-              <button
-                onClick={saveScores}
-                disabled={saving}
-                style={{
-                  width: '100%', height: 46,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  borderRadius: 8, border: 0,
-                  background: saving ? '#ccc' : 'var(--tour-navy)',
-                  color: saving ? '#666' : '#F5EFE0',
-                  fontFamily: 'var(--font-body)', fontWeight: 700,
-                  fontSize: 14, letterSpacing: '.06em', textTransform: 'uppercase',
-                  cursor: saving ? 'not-allowed' : 'pointer',
-                }}
-              >
-                <Save size={16} strokeWidth={2} />
-                {saving ? 'Saving…' : 'Save & Finish Round'}
-              </button>
-            </div>
+              {/* Locked rows */}
+              {sortedScores.map((s, i) => {
+                const player = players.find(p => p.id === s.player_id)
+                const isFirst = s.rank === 1
+                const gross = s.gross_strokes
+                const netDiff = s.net_diff
+                const diffColor = netDiff == null ? 'var(--ink-faint)' : netDiff < 0 ? 'var(--fairway-green)' : netDiff > 0 ? 'var(--tournament-red)' : 'var(--ink-soft)'
+                return (
+                  <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '30px 1fr 52px 48px 52px 54px', alignItems: 'center', padding: '10px 14px', background: isFirst ? 'rgba(201,162,74,.08)' : 'transparent', borderBottom: i < sortedScores.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: isFirst ? 'var(--trophy-gold)' : 'var(--ink-soft)' }}>{s.rank}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <Avatar initials={player ? getInitials(player.name) : '?'} size={26} />
+                      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player?.name ?? '?'}</span>
+                    </div>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--ink-soft)', textAlign: 'center' }}>{gross ?? '—'}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)', textAlign: 'center' }}>{s.strokes ?? '—'}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, textAlign: 'center', color: diffColor }}>
+                      {netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—'}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, textAlign: 'center', color: isFirst ? 'var(--trophy-gold)' : 'var(--ink)' }}>
+                      {s.points_earned != null ? (Number(s.points_earned) % 1 === 0 ? String(s.points_earned) : Number(s.points_earned).toFixed(1)) : '—'}
+                    </span>
+                  </div>
+                )
+              })}
+            </>
+          ) : (
+            <>
+              {/* Editable column header */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px', padding: '5px 14px', background: 'var(--bunker-sand)', borderBottom: '1px solid var(--bunker-sand-deep)' }}>
+                {(['PLAYER', 'GROSS', 'NET', '+/−'] as const).map((lbl, i) => (
+                  <span key={lbl} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: i === 0 ? 'left' : 'center' }}>{lbl}</span>
+                ))}
+              </div>
+
+              {/* Editable rows */}
+              {players.map((p, i) => {
+                const net = scores[p.id] ? Number(scores[p.id]) : null
+                const hcp = hcpData[p.id] ?? null
+                const gross = net != null && hcp != null ? net + hcp : null
+                const netDiff = netDiffData[p.id] ?? null
+                const diffColor = netDiff == null ? 'var(--ink-faint)' : netDiff < 0 ? 'var(--tournament-red)' : 'var(--ink)'
+                return (
+                  <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px', alignItems: 'center', padding: '9px 14px', borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <Avatar initials={getInitials(p.name)} size={28} />
+                      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                    </div>
+                    <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 15, color: gross != null ? 'var(--ink-soft)' : 'var(--ink-faint)' }}>{gross ?? '—'}</div>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <input
+                        type="number" min={30} max={150} placeholder="—"
+                        value={scores[p.id] ?? ''}
+                        onChange={e => session && setScores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                        readOnly={!session}
+                        style={{ width: 52, height: 34, textAlign: 'center', borderRadius: 6, border: '1.5px solid var(--bunker-sand-deep)', background: scores[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)', color: scores[p.id] ? '#F5EFE0' : 'var(--ink)', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 15, outline: 'none', boxSizing: 'border-box', cursor: session ? 'auto' : 'default' }}
+                      />
+                    </div>
+                    <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: diffColor }}>
+                      {netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—'}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Save button */}
+              {session && (
+                <div style={{ padding: '12px 14px' }}>
+                  <button onClick={saveScores} disabled={saving} style={{ width: '100%', height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, border: 0, background: saving ? '#ccc' : 'var(--tour-navy)', color: saving ? '#666' : '#F5EFE0', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 14, letterSpacing: '.06em', textTransform: 'uppercase', cursor: saving ? 'not-allowed' : 'pointer' }}>
+                    <Save size={16} strokeWidth={2} />
+                    {saving ? 'Saving…' : 'Save & Finish Round'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
-
-      {/* Results */}
-      {isScored && sortedScores.length > 0 && (
-        <section style={{ background: 'var(--tour-navy)', paddingBottom: 8 }}>
-          <div className="broadcast-header" style={{
-            display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px',
-            alignItems: 'center', height: 30, padding: '0 14px',
-          }}>
-            <span>POS</span>
-            <span>PLAYER</span>
-            <span style={{ textAlign: 'right' }}>STROKES</span>
-            <span style={{ textAlign: 'right' }}>POINTS</span>
-          </div>
-
-          {sortedScores.map((s, i) => {
-            const player = players.find(p => p.id === s.player_id)
-            const isFirst = s.rank === 1
-            const isSecond = s.rank === 2
-            const isThird = s.rank === 3
-            return (
-              <div
-                key={s.id}
-                style={{
-                  display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px',
-                  alignItems: 'center', height: 52, padding: '0 14px',
-                  background: isFirst ? 'rgba(201,162,74,.15)' : 'transparent',
-                  color: '#F5EFE0',
-                  borderBottom: i < sortedScores.length - 1 ? '1px solid rgba(255,255,255,.06)' : 'none',
-                }}
-              >
-                <span style={{
-                  width: 26, height: 26, borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 12,
-                  background: isFirst ? 'var(--trophy-gold)' : isSecond ? 'rgba(255,255,255,.15)' : isThird ? 'rgba(201,100,30,.3)' : 'transparent',
-                  color: isFirst ? 'var(--tour-navy)' : '#B9C5D9',
-                }}>
-                  {s.rank}
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                  <Avatar initials={player ? getInitials(player.name) : '?'} size={28} />
-                  <span style={{ fontWeight: 500, fontSize: 15, color: '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {player?.name}
-                  </span>
-                </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: '#B9C5D9', textAlign: 'right' }}>
-                  {s.strokes}
-                </span>
-                <span style={{
-                  fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 18,
-                  textAlign: 'right',
-                  color: isFirst ? 'var(--trophy-gold)' : '#F5EFE0',
-                }}>
-                  {s.points_earned != null
-                    ? (Number(s.points_earned) % 1 === 0 ? s.points_earned : Number(s.points_earned).toFixed(1))
-                    : '—'}
-                </span>
-              </div>
-            )
-          })}
-        </section>
-      )}
     </div>
   )
 }

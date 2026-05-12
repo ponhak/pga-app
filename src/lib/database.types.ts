@@ -37,9 +37,9 @@ export interface Database {
         Update: { group_id: string; player_id: string }
       }
       scores: {
-        Row: { id: string; round_id: string; player_id: string; strokes: number | null; points_earned: number | null; rank: number | null }
-        Insert: { id?: string; round_id: string; player_id: string; strokes?: number | null; points_earned?: number | null; rank?: number | null }
-        Update: { id?: string; round_id?: string; player_id?: string; strokes?: number | null; points_earned?: number | null; rank?: number | null }
+        Row: { id: string; round_id: string; player_id: string; strokes: number | null; gross_strokes: number | null; net_diff: number | null; points_earned: number | null; rank: number | null }
+        Insert: { id?: string; round_id: string; player_id: string; strokes?: number | null; gross_strokes?: number | null; net_diff?: number | null; points_earned?: number | null; rank?: number | null }
+        Update: { id?: string; round_id?: string; player_id?: string; strokes?: number | null; gross_strokes?: number | null; net_diff?: number | null; points_earned?: number | null; rank?: number | null }
       }
     }
   }
