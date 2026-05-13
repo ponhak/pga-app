@@ -31,6 +31,7 @@ export default function PlanningPage() {
   const [savedMyBlocks, setSavedMyBlocks] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [unsavedPrompt, setUnsavedPrompt] = useState<(() => void) | null>(null)
 
   const load = useCallback(async () => {
     if (!session) return
@@ -76,6 +77,21 @@ export default function PlanningPage() {
       else next.add(dateStr)
       return next
     })
+  }
+
+  function guardChanges(action: () => void) {
+    if (mode === 'plan' && hasChanges()) {
+      setUnsavedPrompt(() => action)
+    } else {
+      action()
+    }
+  }
+
+  async function saveAndContinue() {
+    await save()
+    const pending = unsavedPrompt
+    setUnsavedPrompt(null)
+    pending?.()
   }
 
   async function save() {
@@ -143,7 +159,7 @@ export default function PlanningPage() {
           {(['plan', 'overview'] as const).map(m => (
             <button
               key={m}
-              onClick={() => { setMode(m); setSelectedDate(null) }}
+              onClick={() => guardChanges(() => { setMode(m); setSelectedDate(null) })}
               style={{
                 padding: '9px 14px',
                 border: 0,
@@ -161,9 +177,9 @@ export default function PlanningPage() {
 
         {/* Year selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
-          <button onClick={() => setYear(y => y - 1)} style={chevBtn()}><ChevronLeft size={16} strokeWidth={2.5} /></button>
+          <button onClick={() => guardChanges(() => setYear(y => y - 1))} style={chevBtn()}><ChevronLeft size={16} strokeWidth={2.5} /></button>
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', minWidth: 42, textAlign: 'center' }}>{year}</span>
-          <button onClick={() => setYear(y => y + 1)} style={chevBtn()}><ChevronRight size={16} strokeWidth={2.5} /></button>
+          <button onClick={() => guardChanges(() => setYear(y => y + 1))} style={chevBtn()}><ChevronRight size={16} strokeWidth={2.5} /></button>
         </div>
 
         {/* Save button (plan mode only) */}
@@ -192,6 +208,85 @@ export default function PlanningPage() {
         <LegendItem color="rgba(201,162,74,.7)" label="1 person blocked" />
         <LegendItem color="rgba(200,16,46,.5)" label="2+ people blocked" />
       </div>
+
+      {/* Floating save button — visible in plan mode when there are unsaved changes */}
+      {mode === 'plan' && hasChanges() && (
+        <div style={{ position: 'fixed', bottom: 80, right: 16, zIndex: 20 }}>
+          <button
+            onClick={save}
+            disabled={saving}
+            style={{
+              height: 44, padding: '0 20px', borderRadius: 22, border: 0,
+              background: saving ? '#ccc' : 'var(--fairway-green)',
+              color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
+              cursor: saving ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 16px rgba(0,0,0,.22)',
+            }}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      )}
+
+      {/* Unsaved changes popup */}
+      {unsavedPrompt && (
+        <>
+          <div
+            onClick={() => setUnsavedPrompt(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0,0,0,.45)' }}
+          />
+          <div style={{
+            position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)',
+            zIndex: 41,
+            background: '#fff',
+            borderRadius: 16,
+            padding: '28px 24px 20px',
+            width: 'min(320px, calc(100vw - 40px))',
+            boxShadow: '0 8px 40px rgba(0,0,0,.28)',
+            textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>
+              Unsaved changes
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--ink-soft)', marginBottom: 24, lineHeight: 1.5 }}>
+              Do you want to save your availability before leaving?
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { setUnsavedPrompt(null); unsavedPrompt?.() }}
+                style={{
+                  flex: 1, height: 44, borderRadius: 10, border: '1.5px solid var(--bunker-sand-deep)',
+                  background: 'transparent', color: 'var(--ink)', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                }}
+              >
+                No
+              </button>
+              <button
+                onClick={saveAndContinue}
+                disabled={saving}
+                style={{
+                  flex: 1, height: 44, borderRadius: 10, border: 0,
+                  background: saving ? '#ccc' : 'var(--fairway-green)',
+                  color: '#fff', fontWeight: 700, fontSize: 14,
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {saving ? 'Saving…' : 'Yes, save'}
+              </button>
+            </div>
+            <button
+              onClick={() => setUnsavedPrompt(null)}
+              style={{
+                marginTop: 14, background: 'transparent', border: 0,
+                color: 'var(--ink-faint)', fontSize: 12, cursor: 'pointer',
+                fontWeight: 600, letterSpacing: '.04em',
+              }}
+            >
+              Continue planning
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Calendar months */}
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
