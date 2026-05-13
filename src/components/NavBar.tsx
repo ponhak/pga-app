@@ -46,7 +46,7 @@ export function NavBar() {
         zIndex: 10,
         height: 56,
         background: '#0A2240',
-        borderBottom: '1px solid rgba(255,255,255,.08)',
+        borderBottom: 'none',
         overflow: 'visible',
       }}
     >

@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Player, Round, Score } from '@/lib/database.types'
-import { ChevronRight, Trophy } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { NextRoundCountdown } from '@/components/NextRoundCountdown'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -139,51 +139,124 @@ export default function DashboardPage() {
         className="bg-dimple"
         style={{
           background: 'var(--tour-navy)',
-          padding: '68px 16px 28px',
+          padding: '68px 0 0',
           position: 'relative',
         }}
       >
-        <div style={{ position: 'sticky', top: 62, zIndex: 5 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                height: 28, padding: '0 12px', borderRadius: 999,
-                fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase',
-                background: hasStarted ? 'var(--tournament-red)' : 'rgba(255,255,255,.10)',
-                color: '#fff',
+        {/* Status row */}
+        <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            height: 28, padding: '0 12px', borderRadius: 999,
+            fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase',
+            background: hasStarted ? 'var(--tournament-red)' : 'rgba(255,255,255,.10)',
+            color: '#fff',
+          }}>
+            {hasStarted && <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />}
+            {hasStarted ? 'Season Live' : 'Pre-Season'}
+          </span>
+          <span style={{ fontSize: 11, letterSpacing: '.12em', color: '#B9C5D9', fontWeight: 700, textTransform: 'uppercase' }}>
+            {new Date().getFullYear()}
+          </span>
+        </div>
+
+        {/* Leader hero card */}
+        {leader && hasData && (
+          <>
+            <div style={{ position: 'relative', height: 280, overflow: 'hidden', background: 'var(--tour-navy)' }}>
+
+              {/* Player photo — left/center */}
+              {leader.player.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={leader.player.avatar_url}
+                  alt={leader.player.name}
+                  style={{
+                    position: 'absolute', left: '-8%', top: 0,
+                    height: '100%', width: '72%',
+                    objectFit: 'cover', objectPosition: 'top center',
+                  }}
+                />
+              ) : (
+                <div style={{
+                  position: 'absolute', left: 0, top: 0,
+                  height: '100%', width: '60%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'var(--font-display)', fontSize: 120, fontWeight: 700,
+                  color: 'rgba(255,255,255,.08)', lineHeight: 1, userSelect: 'none',
+                }}>
+                  {leader.player.name[0].toUpperCase()}
+                </div>
+              )}
+
+              {/* Gradient: photo right edge → navy */}
+              <div style={{
+                position: 'absolute', left: '42%', top: 0, bottom: 0, width: '18%',
+                background: 'linear-gradient(to right, transparent, #0A2240)',
+                pointerEvents: 'none',
+              }} />
+
+              {/* Bottom gradient — lighter so player is less faded */}
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%',
+                background: 'linear-gradient(to top, rgba(10,34,64,.75) 0%, transparent 100%)',
+                pointerEvents: 'none',
+              }} />
+
+              {/* Trophy — in front of player, bottom-aligned */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/owl-trophy.png"
+                alt="Trophy"
+                style={{
+                  position: 'absolute', right: 8, bottom: '-6%',
+                  height: '106%', width: 'auto',
+                  opacity: 0.30,
+                  filter: 'drop-shadow(0 4px 12px rgba(0,0,0,.4))',
+                }}
+              />
+
+              {/* Stat boxes */}
+              <div style={{
+                position: 'absolute', bottom: 8, left: 12, right: 12,
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
               }}>
-                {hasStarted && <span style={{ width: 6, height: 6, background: '#fff', borderRadius: '50%', display: 'inline-block' }} />}
-                {hasStarted ? 'Season Live' : 'Pre-Season'}
-              </span>
-              <span style={{ fontSize: 11, letterSpacing: '.12em', color: '#B9C5D9', fontWeight: 700, textTransform: 'uppercase' }}>
-                {new Date().getFullYear()}
-              </span>
+                {([
+                  { label: 'Position', value: '1st' },
+                  { label: 'Season Points', value: `${formatPts(leader.totalPoints)} pts` },
+                ] as const).map(({ label, value }) => (
+                  <div key={label} style={{
+                    padding: '8px 14px 10px',
+                    background: 'rgba(5,18,35,.82)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,.14)',
+                    borderRadius: 8,
+                  }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,.50)', marginBottom: 3 }}>
+                      {label}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: '#fff', lineHeight: 1 }}>
+                      {value}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {leader && hasData && (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'rgba(201,162,74,.15)', border: '1px solid rgba(201,162,74,.30)', borderRadius: 8 }}>
-                  <Trophy size={16} color="var(--trophy-gold)" strokeWidth={2} />
-                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0' }}>
-                    {leader.player.name}
-                  </span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 15, color: 'var(--trophy-gold)', marginLeft: 'auto' }}>
-                    {formatPts(leader.totalPoints)} pts
-                  </span>
-                </div>
-                <a
-                  href="#leaderboard"
-                  style={{
-                    display: 'block', marginTop: 8, textAlign: 'right',
-                    fontSize: 12, fontWeight: 600, color: 'rgba(245,239,224,.55)',
-                    letterSpacing: '.04em', textDecoration: 'none',
-                  }}
-                >
-                  Full leaderboard ↓
-                </a>
-              </>
-            )}
-          </div>
+            <div style={{ padding: '8px 16px 20px', textAlign: 'right' }}>
+              <a
+                href="#leaderboard"
+                style={{
+                  fontSize: 12, fontWeight: 600, color: 'rgba(245,239,224,.55)',
+                  letterSpacing: '.04em', textDecoration: 'none',
+                }}
+              >
+                Full leaderboard ↓
+              </a>
+            </div>
+          </>
+        )}
       </section>
 
       {/* ── Round today banner ── */}
