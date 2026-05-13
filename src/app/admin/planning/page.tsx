@@ -248,8 +248,25 @@ export default function PlanningPage() {
       }
       setPendingDeletions([])
 
+      // Re-fetch linked_round_ids from DB so stale in-memory state can't cause duplicate inserts
+      let freshRounds = planRounds
+      if (currentPlanId) {
+        const { data: freshPr } = await db
+          .from('season_plan_rounds')
+          .select('round_number, round_id')
+          .eq('plan_id', currentPlanId)
+        if (freshPr) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const dbMap = Object.fromEntries(freshPr.map((r: any) => [r.round_number, r.round_id as string | null]))
+          freshRounds = planRounds.map(r => ({
+            ...r,
+            linked_round_id: r.linked_round_id ?? dbMap[r.round_number] ?? null,
+          }))
+        }
+      }
+
       // Sync each plan round that has a date
-      const updatedRounds = await Promise.all(planRounds.map(async r => {
+      const updatedRounds = await Promise.all(freshRounds.map(async r => {
         if (!r.date) return r
 
         if (r.linked_round_id) {
