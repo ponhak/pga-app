@@ -282,16 +282,6 @@ export default function DashboardPage() {
                     <span style={{ fontWeight: 500, fontSize: 15, color: '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {s.player.name}
                     </span>
-                    {s.wins > 0 && (
-                      <span style={{
-                        flexShrink: 0, height: 18, padding: '0 6px', borderRadius: 999,
-                        fontSize: 9, fontWeight: 700, letterSpacing: '.08em',
-                        background: 'rgba(201,162,74,.25)', color: 'var(--trophy-gold)',
-                        display: 'flex', alignItems: 'center',
-                      }}>
-                        {s.wins}W
-                      </span>
-                    )}
                   </span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#B9C5D9', textAlign: 'right' }}>
                     {s.roundsPlayed}
