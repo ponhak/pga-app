@@ -195,14 +195,14 @@ export default function PlanningPage() {
 
       {/* Floating save button */}
       {mode === 'plan' && (
-        <div style={{ position: 'fixed', bottom: 80, right: 16, zIndex: 20 }}>
+        <div style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 20 }}>
           <button
             onClick={save}
             disabled={saving || !hasChanges()}
             style={{
-              height: 48, padding: '0 28px', borderRadius: 10, border: 0,
-              background: saving || !hasChanges() ? '#ccc' : 'var(--tour-navy)',
-              color: saving || !hasChanges() ? '#fff' : 'var(--trophy-gold)',
+              height: 48, width: 220, borderRadius: 10, border: 0,
+              background: saving || !hasChanges() ? '#ccc' : 'var(--fairway-green)',
+              color: '#fff',
               fontWeight: 700, fontSize: 13, letterSpacing: '.10em', textTransform: 'uppercase',
               cursor: saving || !hasChanges() ? 'not-allowed' : 'pointer',
               boxShadow: '0 4px 20px rgba(0,0,0,.28)',
