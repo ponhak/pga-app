@@ -147,8 +147,8 @@ export default function SchedulePage() {
               >
                 {/* Card row */}
                 <div
-                  onClick={() => { if (!session && status === 'upcoming') return; router.push(`/rounds/${entry.id}`) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer' }}
+                  onClick={() => { if (status === 'upcoming') return; router.push(`/rounds/${entry.id}`) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: status === 'upcoming' ? 'default' : 'pointer' }}
                 >
                   {/* Calendar block */}
                   <div style={{
@@ -219,7 +219,7 @@ export default function SchedulePage() {
                     >
                       {isEditing ? <X size={14} strokeWidth={2.5} /> : <Pencil size={14} strokeWidth={2} />}
                     </button>
-                  ) : (session || status === 'scored') ? (
+                  ) : (status !== 'upcoming' && (session || status === 'scored')) ? (
                     <ChevronRight size={16} color="var(--ink-faint)" strokeWidth={2} />
                   ) : null}
                 </div>
