@@ -2,16 +2,21 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, CalendarDays, Trophy } from 'lucide-react'
+import { Home, CalendarDays, Trophy, CalendarRange } from 'lucide-react'
+import { useAuth } from '@/components/AuthProvider'
 
-const tabs = [
+const BASE_TABS = [
   { id: 'home',     href: '/',         label: 'Home',     Icon: Home },
   { id: 'schedule', href: '/schedule', label: 'Schedule', Icon: CalendarDays },
   { id: 'history',  href: '/history',  label: 'History',  Icon: Trophy },
 ]
 
+const PLANNING_TAB = { id: 'planning', href: '/planning', label: 'Availability', Icon: CalendarRange }
+
 export function BottomTabBar() {
   const pathname = usePathname()
+  const { session } = useAuth()
+  const tabs = session ? [...BASE_TABS, PLANNING_TAB] : BASE_TABS
 
   function isActive(href: string) {
     if (href === '/') return pathname === '/'

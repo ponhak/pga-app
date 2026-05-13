@@ -51,6 +51,11 @@ export interface Database {
         Insert: { id?: string; round_id: string; player_id: string; strokes?: number | null; gross_strokes?: number | null; net_diff?: number | null; points_earned?: number | null; rank?: number | null; dnf?: boolean }
         Update: { id?: string; round_id?: string; player_id?: string; strokes?: number | null; gross_strokes?: number | null; net_diff?: number | null; points_earned?: number | null; rank?: number | null; dnf?: boolean }
       }
+      availability_blocks: {
+        Row: { id: string; user_id: string; user_email: string; date: string; created_at: string }
+        Insert: { id?: string; user_id: string; user_email: string; date: string; created_at?: string }
+        Update: { id?: string; user_id?: string; user_email?: string; date?: string; created_at?: string }
+      }
     }
   }
 }
