@@ -188,12 +188,12 @@ export default function SchedulePage() {
                   {/* Double points badge */}
                   {entry.double_points && (
                     <span style={{
-                      flexShrink: 0, height: 22, padding: '0 8px', borderRadius: 999,
-                      fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase',
-                      background: 'rgba(201,162,74,.22)', color: 'var(--trophy-gold)',
-                      display: 'flex', alignItems: 'center',
+                      flexShrink: 0, height: 24, padding: '0 9px', borderRadius: 999,
+                      fontSize: 11, fontWeight: 900, letterSpacing: '.04em',
+                      background: 'var(--trophy-gold)', color: 'var(--tour-navy)',
+                      display: 'flex', alignItems: 'center', gap: 3,
                     }}>
-                      2×
+                      ⚡ 2×
                     </span>
                   )}
 

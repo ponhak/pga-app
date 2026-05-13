@@ -424,7 +424,7 @@ export default function PlanningPage() {
               {planRounds.map((r, i) => (
                 <div
                   key={i}
-                  style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px 32px', gap: 8, padding: '10px 14px', alignItems: 'center', borderBottom: i < planRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}
+                  style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px 32px', gap: 8, padding: '10px 14px', alignItems: 'center', borderBottom: i < planRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', background: r.double_points ? 'rgba(201,162,74,.07)' : 'transparent', transition: 'background .15s' }}
                 >
                   <span style={{ fontSize: 12, fontWeight: 700, color: r.linked_round_id ? 'var(--fairway-green)' : 'var(--ink-faint)', textAlign: 'center' }}>
                     {r.round_number}
@@ -445,15 +445,17 @@ export default function PlanningPage() {
                   <button
                     type="button"
                     onClick={() => updateRound(i, { double_points: !r.double_points })}
+                    title={r.double_points ? 'Double points ON — click to disable' : 'Click to enable double points'}
                     style={{
-                      height: 36, borderRadius: 7, border: '1.5px solid',
+                      height: 36, borderRadius: 7, border: '2px solid',
                       borderColor: r.double_points ? 'var(--trophy-gold)' : 'var(--bunker-sand-deep)',
-                      background: r.double_points ? 'rgba(201,162,74,.15)' : 'transparent',
-                      color: r.double_points ? 'var(--trophy-gold)' : 'var(--ink-faint)',
-                      fontSize: 11, fontWeight: 800, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: r.double_points ? 'var(--trophy-gold)' : 'transparent',
+                      color: r.double_points ? 'var(--tour-navy)' : 'var(--ink-faint)',
+                      fontSize: 11, fontWeight: 900, letterSpacing: '.04em', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2,
                     }}
                   >
+                    {r.double_points && <Zap size={10} strokeWidth={3} />}
                     2×
                   </button>
                   <button
