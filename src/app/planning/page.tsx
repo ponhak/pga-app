@@ -19,6 +19,7 @@ const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 
 interface Block {
   date: string
+  user_id: string
   user_email: string
 }
 
@@ -32,13 +33,20 @@ export default function PlanningPage() {
   const [saving, setSaving] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [unsavedPrompt, setUnsavedPrompt] = useState<(() => void) | null>(null)
+  const [profileNames, setProfileNames] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     if (!session) return
-    const { data } = await db.from('availability_blocks')
-      .select('date, user_email')
-      .gte('date', `${year}-01-01`)
-      .lte('date', `${year}-12-31`)
+    const [{ data }, { data: profiles }] = await Promise.all([
+      db.from('availability_blocks')
+        .select('date, user_id, user_email')
+        .gte('date', `${year}-01-01`)
+        .lte('date', `${year}-12-31`),
+      db.from('profiles').select('id, name'),
+    ])
+    const nameMap: Record<string, string> = {}
+    ;(profiles ?? []).forEach((p: { id: string; name: string }) => { nameMap[p.id] = p.name })
+    setProfileNames(nameMap)
     const blocks: Block[] = data ?? []
     setAllBlocks(blocks)
     const mine = new Set(
@@ -390,7 +398,7 @@ export default function PlanningPage() {
                       .filter(b => b.date === selectedDate)
                       .map(b => (
                         <div key={b.user_email} style={{ fontSize: 13, color: 'var(--ink)', padding: '3px 0', fontWeight: 500 }}>
-                          {b.user_email}
+                          {profileNames[b.user_id] ?? b.user_email}
                         </div>
                       ))
                   )}
