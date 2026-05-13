@@ -11,11 +11,10 @@ import { ShieldCheck, ChevronLeft, Plus, ChevronRight, Pencil, Trash2, X, Check 
 import type { Round, Player, Score } from '@/lib/database.types'
 import { assignPoints } from '@/lib/points'
 import Link from 'next/link'
+import { ADMIN_EMAIL } from '@/lib/auth'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
-
-const ADMIN_EMAIL = 'ponhak@gmail.com'
 
 const today = new Date().toISOString().slice(0, 10)
 const currentYear = new Date().getFullYear()

@@ -5,8 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useRouter } from 'next/navigation'
 import { ShieldCheck, Users, Database, CalendarDays, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
-
-const ADMIN_EMAIL = 'ponhak@gmail.com'
+import { ADMIN_EMAIL } from '@/lib/auth'
 
 interface AdminCard {
   href: string

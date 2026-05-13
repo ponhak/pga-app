@@ -8,11 +8,10 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import { toast } from 'sonner'
 import { ShieldCheck, ChevronLeft, Zap, Save, RefreshCw, X } from 'lucide-react'
+import { ADMIN_EMAIL } from '@/lib/auth'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
-
-const ADMIN_EMAIL = 'ponhak@gmail.com'
 const THIS_YEAR = new Date().getFullYear()
 
 interface PlanRound {

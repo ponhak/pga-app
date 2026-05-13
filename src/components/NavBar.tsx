@@ -5,8 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { UserCircle, LogIn, LogOut, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
-
-const ADMIN_EMAIL = 'ponhak@gmail.com'
+import { ADMIN_EMAIL } from '@/lib/auth'
 
 export function NavBar() {
   const pathname = usePathname()

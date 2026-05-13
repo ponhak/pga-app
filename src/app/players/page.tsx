@@ -9,11 +9,10 @@ import { toast } from 'sonner'
 import { Camera, Search, X, Plus, ChevronLeft } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { useRouter } from 'next/navigation'
+import { ADMIN_EMAIL } from '@/lib/auth'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
-
-const ADMIN_EMAIL = 'ponhak@gmail.com'
 
 function PlayerAvatar({ url, initials, size = 48 }: { url: string | null; initials: string; size?: number }) {
   if (url) {
@@ -197,7 +196,7 @@ export default function PlayersPage() {
             }}
           />
         </div>
-        {session && (
+        {isAdmin && (
           <button
             onClick={() => setShowAdd(v => !v)}
             style={{
@@ -214,7 +213,7 @@ export default function PlayersPage() {
       </div>
 
       {/* Add player form */}
-      {session && showAdd && (
+      {isAdmin && showAdd && (
         <form
           onSubmit={addPlayer}
           style={{
