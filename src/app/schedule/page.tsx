@@ -141,8 +141,11 @@ export default function SchedulePage() {
   const upcoming = rounds
     .filter(r => !r.hasScores && r.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))
+  const pending = rounds
+    .filter(r => !r.hasScores && r.date < today)
+    .sort((a, b) => b.date.localeCompare(a.date))
   const past = rounds
-    .filter(r => r.hasScores || r.date < today)
+    .filter(r => r.hasScores)
     .sort((a, b) => b.date.localeCompare(a.date))
 
   function renderSection(label: string, entries: RoundEntry[]) {
@@ -226,14 +229,16 @@ export default function SchedulePage() {
                     </span>
                   )}
 
-                  {/* Status pill */}
-                  <span style={{
-                    flexShrink: 0, height: 22, padding: '0 9px', borderRadius: 999,
-                    fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase',
-                    background: st.bg, color: st.color, display: 'flex', alignItems: 'center',
-                  }}>
-                    {st.label}
-                  </span>
+                  {/* Status pill — only for past rounds (upcoming section header is sufficient) */}
+                  {status !== 'upcoming' && (
+                    <span style={{
+                      flexShrink: 0, height: 22, padding: '0 9px', borderRadius: 999,
+                      fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase',
+                      background: st.bg, color: st.color, display: 'flex', alignItems: 'center',
+                    }}>
+                      {st.label}
+                    </span>
+                  )}
 
                   {canEdit ? (
                     <button
@@ -350,6 +355,7 @@ export default function SchedulePage() {
       ) : (
         <div>
           {upcoming.length > 0 && renderSection('Upcoming', upcoming)}
+          {pending.length > 0 && renderSection('Report result', pending)}
           {past.length > 0 && renderSection('Past rounds', past)}
         </div>
       )}

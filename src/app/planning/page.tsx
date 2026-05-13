@@ -25,7 +25,7 @@ interface Block {
 export default function PlanningPage() {
   const { session, loading } = useAuth()
   const [mode, setMode] = useState<'plan' | 'overview'>('plan')
-  const [year, setYear] = useState(new Date().getFullYear() + 1)
+  const [year, setYear] = useState(new Date().getFullYear())
   const [allBlocks, setAllBlocks] = useState<Block[]>([])
   const [pendingMyBlocks, setPendingMyBlocks] = useState<Set<string>>(new Set())
   const [savedMyBlocks, setSavedMyBlocks] = useState<Set<string>>(new Set())
@@ -153,7 +153,7 @@ export default function PlanningPage() {
       </div>
 
       {/* Controls */}
-      <div style={{ padding: '14px 16px 10px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ padding: '14px 16px 10px', display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
         {/* Mode toggle */}
         <div style={{ display: 'flex', background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
           {(['plan', 'overview'] as const).map(m => (
@@ -176,7 +176,7 @@ export default function PlanningPage() {
         </div>
 
         {/* Year selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <button onClick={() => guardChanges(() => setYear(y => y - 1))} style={chevBtn()}><ChevronLeft size={16} strokeWidth={2.5} /></button>
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', minWidth: 42, textAlign: 'center' }}>{year}</span>
           <button onClick={() => guardChanges(() => setYear(y => y + 1))} style={chevBtn()}><ChevronRight size={16} strokeWidth={2.5} /></button>

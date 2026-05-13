@@ -54,6 +54,7 @@ export function BottomTabBar() {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 3,
+              height: 64,
               color: on ? 'var(--trophy-gold)' : '#B9C5D9',
               fontSize: 10,
               fontWeight: 700,
