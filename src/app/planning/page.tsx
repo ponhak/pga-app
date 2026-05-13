@@ -182,22 +182,6 @@ export default function PlanningPage() {
           <button onClick={() => guardChanges(() => setYear(y => y + 1))} style={chevBtn()}><ChevronRight size={16} strokeWidth={2.5} /></button>
         </div>
 
-        {/* Save button (plan mode only) */}
-        {mode === 'plan' && (
-          <button
-            onClick={save}
-            disabled={saving || !hasChanges()}
-            style={{
-              height: 38, padding: '0 18px', borderRadius: 8, border: 0,
-              background: saving || !hasChanges() ? '#ccc' : 'var(--fairway-green)',
-              color: '#fff', fontWeight: 700, fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase',
-              cursor: saving || !hasChanges() ? 'not-allowed' : 'pointer',
-              transition: 'background .15s',
-            }}
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        )}
       </div>
 
       {/* Legend */}
@@ -209,18 +193,20 @@ export default function PlanningPage() {
         <LegendItem color="rgba(200,16,46,.5)" label="2+ people blocked" />
       </div>
 
-      {/* Floating save button — visible in plan mode when there are unsaved changes */}
-      {mode === 'plan' && hasChanges() && (
+      {/* Floating save button */}
+      {mode === 'plan' && (
         <div style={{ position: 'fixed', bottom: 80, right: 16, zIndex: 20 }}>
           <button
             onClick={save}
-            disabled={saving}
+            disabled={saving || !hasChanges()}
             style={{
-              height: 44, padding: '0 20px', borderRadius: 22, border: 0,
-              background: saving ? '#ccc' : 'var(--fairway-green)',
-              color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
-              cursor: saving ? 'not-allowed' : 'pointer',
-              boxShadow: '0 4px 16px rgba(0,0,0,.22)',
+              height: 48, padding: '0 28px', borderRadius: 10, border: 0,
+              background: saving || !hasChanges() ? '#ccc' : 'var(--tour-navy)',
+              color: saving || !hasChanges() ? '#fff' : 'var(--trophy-gold)',
+              fontWeight: 700, fontSize: 13, letterSpacing: '.10em', textTransform: 'uppercase',
+              cursor: saving || !hasChanges() ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 20px rgba(0,0,0,.28)',
+              transition: 'background .15s',
             }}
           >
             {saving ? 'Saving…' : 'Save'}
