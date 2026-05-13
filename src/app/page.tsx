@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Player, Round, Score } from '@/lib/database.types'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import { NextRoundCountdown } from '@/components/NextRoundCountdown'
 import { PlayerAvatar } from '@/components/PlayerAvatar'
 
@@ -32,11 +32,303 @@ function formatPts(n: number) {
   return n % 1 === 0 ? String(n) : n.toFixed(1)
 }
 
+function ordinal(n: number) {
+  if (n === 1) return '1st'
+  if (n === 2) return '2nd'
+  if (n === 3) return '3rd'
+  return `${n}th`
+}
+
+function avg(arr: number[]) {
+  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null
+}
+
+// ── Player stats panel ───────────────────────────────────────────────────────
+
+function PlayerStatsPanel({
+  player,
+  standing,
+  standings,
+  allRounds,
+  allScores,
+}: {
+  player: Player
+  standing: Standing
+  standings: Standing[]
+  allRounds: Round[]
+  allScores: Score[]
+}) {
+  const [careerScores, setCareerScores] = useState<{ rank: number | null; dnf: boolean }[] | null>(null)
+
+  useEffect(() => {
+    db.from('scores').select('rank, dnf').eq('player_id', player.id).then(({ data }: { data: { rank: number | null; dnf: boolean }[] | null }) => {
+      setCareerScores(data ?? [])
+    })
+  }, [player.id])
+
+  // Season stats
+  const playerScores = allScores.filter(s => s.player_id === player.id && s.strokes != null)
+  const ranks = playerScores.map(s => s.rank).filter((r): r is number => r != null)
+  const nets  = playerScores.map(s => s.strokes).filter((s): s is number => s != null)
+
+  const bestFinish   = ranks.length ? Math.min(...ranks) : null
+  const avgFinish    = avg(ranks)
+  const avgNet       = avg(nets)
+  const ptsPerRound  = standing.roundsPlayed > 0 ? standing.totalPoints / standing.roundsPlayed : null
+
+  // Chart: player's leaderboard position after each round
+  const fieldSize = Math.max(standings.length, 2)
+  const runningPts: Record<string, number> = {}
+  standings.forEach(s => { runningPts[s.player.id] = 0 })
+
+  const posPoints = allRounds.map(r => {
+    const roundScores = allScores.filter(sc => sc.round_id === r.id)
+    const hasScores = roundScores.some(sc => sc.strokes != null)
+    roundScores.forEach(sc => {
+      if (sc.points_earned != null)
+        runningPts[sc.player_id] = (runningPts[sc.player_id] ?? 0) + Number(sc.points_earned)
+    })
+    if (!hasScores) return { played: false, pos: null as number | null }
+    const sorted = Object.entries(runningPts).sort(([, a], [, b]) => b - a)
+    const pos = sorted.findIndex(([id]) => id === player.id) + 1
+    return { played: true, pos }
+  })
+
+  // Carry-forward position for context line (unplayed rounds inherit last position)
+  let lastPos: number | null = null
+  const chartPoints = posPoints.map(p => {
+    if (p.played && p.pos != null) lastPos = p.pos
+    return { played: p.played, pos: p.played ? p.pos : lastPos }
+  })
+
+  // Current standing position (last played round)
+  const currentPos = posPoints.reduceRight<number | null>((acc, p) => acc ?? (p.played ? p.pos : null), null)
+
+  // Chart geometry
+  const CW = 300, CH = 160
+  const LEFT = 32, RIGHT = 8, TOP = 12, BOTTOM = 20
+  const chartW = CW - LEFT - RIGHT
+  const chartH = CH - TOP - BOTTOM
+  const sx = (i: number) => LEFT + (allRounds.length < 2 ? chartW / 2 : (i / (allRounds.length - 1)) * chartW)
+  // pos=1 → top (y=TOP), pos=fieldSize → bottom (y=TOP+chartH)
+  const sy = (pos: number) => TOP + ((pos - 1) / Math.max(fieldSize - 1, 1)) * chartH
+
+  // Dashed grey context line (carry-forward so unplayed rounds show flat)
+  const contextLine = chartPoints
+    .map((p, i) => p.pos != null ? `${sx(i)},${sy(p.pos)}` : null)
+    .filter((v): v is string => v !== null)
+    .join(' ')
+
+  // Gold solid line connecting played rounds
+  const playedPolyline = posPoints
+    .map((p, i) => p.played && p.pos != null ? `${sx(i)},${sy(p.pos)}` : null)
+    .filter((v): v is string => v !== null)
+    .join(' ')
+
+  // Y-axis: every position 1..fieldSize
+  const yAxisPositions = Array.from({ length: fieldSize }, (_, i) => i + 1)
+
+  // Career stats (all-time including current season)
+  const careerRanks = (careerScores ?? []).map(s => s.rank).filter((r): r is number => r != null)
+  const careerWins      = careerRanks.filter(r => r === 1).length
+  const careerBest      = careerRanks.length ? Math.min(...careerRanks) : null
+  const careerAvgFinish = avg(careerRanks)
+
+  const pill = (label: string, value: string, gold = false) => (
+    <div key={label} style={{
+      padding: '8px 10px',
+      background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.10)',
+      borderRadius: 8,
+    }}>
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: gold ? 'var(--trophy-gold)' : '#F5EFE0', lineHeight: 1 }}>
+        {value}
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', background: 'rgba(5,15,30,.6)' }}>
+
+      {/* Season section */}
+      <div style={{ padding: '14px 14px 0' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#F5EFE0', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.12)' }}>
+          {new Date().getFullYear()} Season
+        </div>
+
+        {/* Stat grid — 3 columns, wraps to 2 rows */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+          {pill('Wins', `${standing.wins}`, standing.wins > 0)}
+          {pill('Best finish', bestFinish != null ? ordinal(bestFinish) : '—')}
+          {pill('Avg finish',  avgFinish  != null ? ordinal(Math.round(avgFinish)) : '—')}
+          {pill('Avg net',     avgNet     != null ? String(Math.round(avgNet)) : '—')}
+          {pill('Pts / round', ptsPerRound != null ? formatPts(Math.round(ptsPerRound * 10) / 10) : '—')}
+        </div>
+      </div>
+
+      {/* Position chart — highlight card */}
+      {allRounds.length > 0 && (
+        <div style={{ padding: '10px 14px 0' }}>
+          <div style={{
+            background: 'rgba(255,255,255,.04)',
+            border: '1px solid rgba(255,255,255,.09)',
+            borderRadius: 10,
+            padding: '12px 12px 10px',
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,.40)' }}>
+                Season Standings
+              </span>
+              <span style={{
+                fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700,
+                color: 'var(--trophy-gold)', lineHeight: 1,
+              }}>
+                {currentPos != null ? ordinal(currentPos) : '—'}
+              </span>
+            </div>
+
+            <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" width="100%" height={CH}
+                 style={{ display: 'block', overflow: 'visible' }}>
+
+              {/* Y-axis grid lines + labels (1st at top, last at bottom) */}
+              {yAxisPositions.map((pos) => (
+                <g key={pos}>
+                  <line x1={LEFT} y1={sy(pos)} x2={CW - RIGHT} y2={sy(pos)}
+                    stroke="rgba(255,255,255,.08)" strokeWidth="1" strokeDasharray={pos === 1 ? 'none' : '3 5'} />
+                  <text x={LEFT - 4} y={sy(pos) + 3.5} textAnchor="end"
+                    style={{ fontSize: 8, fill: 'rgba(255,255,255,.35)', fontFamily: 'monospace' }}>
+                    {ordinal(pos)}
+                  </text>
+                </g>
+              ))}
+
+              {/* Dashed context line (carry-forward position for unplayed rounds) */}
+              {contextLine && (
+                <polyline points={contextLine}
+                  fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="1.5" strokeDasharray="3 5" />
+              )}
+
+              {/* Gold position line (played rounds only) */}
+              {playedPolyline && (
+                <polyline points={playedPolyline} fill="none" stroke="var(--trophy-gold)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+              )}
+
+              {/* Dots at played rounds */}
+              {posPoints.map((p, i) => p.played && p.pos != null && (
+                <circle key={i} cx={sx(i)} cy={sy(p.pos)}
+                  r={i === posPoints.length - 1 ? 4.5 : 3}
+                  fill="var(--trophy-gold)" />
+              ))}
+
+              {/* X-axis round labels: R1, R2, … */}
+              {allRounds.map((_, i) => (
+                <text key={i} x={sx(i)} y={CH} textAnchor="middle"
+                  style={{ fontSize: 8, fill: 'rgba(255,255,255,.35)', fontFamily: 'monospace' }}>
+                  {`R${i + 1}`}
+                </text>
+              ))}
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* Round table */}
+      <div style={{ padding: '10px 14px 0' }}>
+        {/* Header */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 44px', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,.08)', marginBottom: 2 }}>
+          {['Date', 'Rank', 'Net', '+/−', 'Pts'].map((h, i) => (
+            <span key={h} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', textAlign: i > 0 ? 'center' : 'left' }}>
+              {h}
+            </span>
+          ))}
+        </div>
+        {allRounds.map((r, i) => {
+          const sc = allScores.find(s => s.round_id === r.id && s.player_id === player.id)
+          const played = sc && sc.strokes != null
+          const isDnf  = sc?.dnf === true
+          const d = new Date(r.date + 'T12:00:00')
+          const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+          const diffColor = sc?.net_diff == null ? 'rgba(255,255,255,.30)'
+            : sc.net_diff < 0 ? 'var(--tournament-red)' : '#F5EFE0'
+
+          return (
+            <div key={r.id} style={{
+              display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 44px',
+              alignItems: 'center', padding: '7px 0',
+              borderBottom: i < allRounds.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none',
+              opacity: played || isDnf ? 1 : 0.38,
+            }}>
+              <div>
+                <span style={{ fontSize: 12, color: '#F5EFE0', fontWeight: 500 }}>{dateStr}</span>
+                {r.double_points && <span style={{ marginLeft: 4, fontSize: 9, color: 'var(--trophy-gold)' }}>⚡</span>}
+                {r.notes && <div style={{ fontSize: 10, color: 'rgba(255,255,255,.40)', marginTop: 1 }}>{r.notes}</div>}
+              </div>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, textAlign: 'center',
+                color: isDnf ? 'var(--tournament-red)' : played ? '#F5EFE0' : 'rgba(255,255,255,.30)' }}>
+                {isDnf ? 'DNF' : played ? ordinal(sc!.rank!) : '—'}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, textAlign: 'center', color: played ? '#F5EFE0' : 'rgba(255,255,255,.30)' }}>
+                {played ? sc!.strokes : '—'}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, textAlign: 'center', color: played ? diffColor : 'rgba(255,255,255,.30)' }}>
+                {played && sc!.net_diff != null ? (sc!.net_diff > 0 ? `+${sc!.net_diff}` : String(sc!.net_diff)) : '—'}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, textAlign: 'center', color: played ? 'var(--trophy-gold)' : 'rgba(255,255,255,.30)' }}>
+                {played ? formatPts(Number(sc!.points_earned)) : '—'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Career section */}
+      <div style={{ padding: '14px' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#F5EFE0', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.12)' }}>
+          Career
+        </div>
+        {careerScores === null ? (
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.30)' }}>Loading…</div>
+        ) : careerRanks.length === 0 ? (
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.30)' }}>First season — no prior data</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {[
+              { label: 'Career Wins',   value: String(careerWins),    gold: careerWins > 0 },
+              { label: 'Career Best',   value: careerBest != null ? ordinal(careerBest) : '—', gold: careerBest === 1 },
+              { label: 'Career Avg',    value: careerAvgFinish != null ? ordinal(Math.round(careerAvgFinish)) : '—', gold: false },
+            ].map(({ label, value, gold }) => (
+              <div key={label} style={{
+                padding: '8px 10px',
+                background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.09)',
+                borderRadius: 8,
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.40)', marginBottom: 3 }}>
+                  {label}
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: gold ? 'var(--trophy-gold)' : '#F5EFE0', lineHeight: 1 }}>
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const [standings, setStandings] = useState<Standing[]>([])
   const [recentRounds, setRecentRounds] = useState<RecentRound[]>([])
+  const [allRounds, setAllRounds] = useState<Round[]>([])
+  const [allScores, setAllScores] = useState<Score[]>([])
   const [todayRound, setTodayRound] = useState<Round | null>(null)
   const [loading, setLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => { loadData() }, [])
@@ -90,6 +382,8 @@ export default function DashboardPage() {
         a.player.name.localeCompare(b.player.name)
       )
     setStandings(sorted)
+    setAllRounds([...typedRounds].sort((a, b) => a.date.localeCompare(b.date)))
+    setAllScores(typedScores)
 
     const rpByRound: Record<string, number> = {}
     typedRP.forEach((rp) => {
@@ -304,13 +598,14 @@ export default function DashboardPage() {
 
         {/* Column header */}
         <div className="broadcast-header" style={{
-          display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px',
+          display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px 28px',
           alignItems: 'center', height: 30, padding: '0 14px',
         }}>
           <span>POS</span>
           <span>PLAYER</span>
           <span style={{ textAlign: 'right' }}>ROUNDS</span>
           <span style={{ textAlign: 'right' }}>POINTS</span>
+          <span />
         </div>
 
         {/* Rows */}
@@ -325,40 +620,43 @@ export default function DashboardPage() {
         ) : (
           <div>
             {standings.map((s, i) => {
-              const isLeader = i === 0 && hasData
+              const isLeader  = i === 0 && hasData
+              const isExpanded = expandedId === s.player.id
               const rowBg = isLeader ? 'rgba(201,162,74,.15)' : 'transparent'
               return (
-                <div
-                  key={s.player.id}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px',
-                    alignItems: 'center', height: 52, padding: '0 14px',
-                    background: rowBg, color: '#F5EFE0',
-                    borderBottom: '1px solid rgba(255,255,255,.06)',
-                  }}
-                >
-                  <span style={{
-                    fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500,
-                    color: isLeader ? 'var(--trophy-gold)' : '#B9C5D9',
-                  }}>
-                    {i + 1}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                    <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={28} gold={isLeader} />
-                    <span style={{ fontWeight: 500, fontSize: 15, color: '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {s.player.name}
+                <div key={s.player.id}>
+                  <div
+                    onClick={() => setExpandedId(isExpanded ? null : s.player.id)}
+                    style={{
+                      display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px 28px',
+                      alignItems: 'center', height: 52, padding: '0 14px',
+                      background: rowBg, color: '#F5EFE0',
+                      borderBottom: isExpanded ? 'none' : '1px solid rgba(255,255,255,.06)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: isLeader ? 'var(--trophy-gold)' : '#B9C5D9' }}>
+                      {i + 1}
                     </span>
-                  </span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#B9C5D9', textAlign: 'right' }}>
-                    {s.roundsPlayed}
-                  </span>
-                  <span style={{
-                    fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 18,
-                    textAlign: 'right',
-                    color: isLeader ? 'var(--trophy-gold)' : (s.totalPoints > 0 ? '#F5EFE0' : '#8895AC'),
-                  }}>
-                    {formatPts(s.totalPoints)}
-                  </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                      <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={28} gold={isLeader} />
+                      <span style={{ fontWeight: 500, fontSize: 15, color: '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {s.player.name}
+                      </span>
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: '#B9C5D9', textAlign: 'right' }}>
+                      {s.roundsPlayed}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 18, textAlign: 'right', color: isLeader ? 'var(--trophy-gold)' : (s.totalPoints > 0 ? '#F5EFE0' : '#8895AC') }}>
+                      {formatPts(s.totalPoints)}
+                    </span>
+                    <span style={{ display: 'flex', justifyContent: 'center', color: '#8895AC' }}>
+                      {isExpanded ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
+                    </span>
+                  </div>
+                  {isExpanded && (
+                    <PlayerStatsPanel player={s.player} standing={s} standings={standings} allRounds={allRounds} allScores={allScores} />
+                  )}
                 </div>
               )
             })}

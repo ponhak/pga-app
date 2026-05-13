@@ -72,12 +72,15 @@ export default function UsersPage() {
   async function toggleAdmin(email: string, current: boolean) {
     if (email === ADMIN_EMAIL) return
     setToggling(email)
-    const { error } = await db
+    const { error, count } = await db
       .from('allowed_emails')
       .update({ is_admin: !current })
       .eq('email', email)
+      .select('email', { count: 'exact', head: true })
     if (error) {
       toast.error(error.message)
+    } else if (count === 0) {
+      toast.error('Permission denied — check Supabase RLS policies')
     } else {
       toast.success(`${email} is ${!current ? 'now an admin' : 'no longer an admin'}`)
       await load()
