@@ -124,11 +124,14 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
 
   return paired
     .map(r => {
-      if ((r.strokes < 55 || r.strokes > 160) && r.netDiff != null && inferredPar != null) {
+      let strokes = r.strokes
+      if ((strokes < 55 || strokes > 160) && r.netDiff != null && inferredPar != null) {
         const recovered = inferredPar + r.netDiff
-        if (recovered >= 55 && recovered <= 160) return { ...r, strokes: recovered }
+        if (recovered >= 55 && recovered <= 160) strokes = recovered
       }
-      return r
+      // Recompute netDiff from inferred par — OCR often misreads the minus sign
+      const netDiff = inferredPar != null ? strokes - inferredPar : r.netDiff
+      return { ...r, strokes, netDiff }
     })
     .filter(r => r.strokes >= 55 && r.strokes <= 160)
 }
@@ -983,7 +986,7 @@ export default function RoundPage() {
                 const hcp = hcpData[p.id] ?? null
                 const gross = net != null && hcp != null ? net + hcp : null
                 const netDiff = netDiffData[p.id] ?? null
-                const diffColor = netDiff == null ? 'var(--ink-faint)' : netDiff < 0 ? 'var(--tournament-red)' : 'var(--ink)'
+                const diffColor = netDiff == null ? 'var(--ink-faint)' : netDiff > 0 ? 'var(--tournament-red)' : netDiff < 0 ? 'var(--fairway-green)' : 'var(--ink)'
                 return (
                   <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px', alignItems: 'center', padding: '9px 14px', borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
