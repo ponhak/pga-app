@@ -8,6 +8,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import { toast } from 'sonner'
 import { X, Plus, ShieldCheck, ChevronLeft } from 'lucide-react'
+import { ADMIN_EMAIL } from '@/lib/auth'
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
 
