@@ -69,7 +69,7 @@ export default function PlayersPage() {
     const nickMap: Record<string, string> = {}
     list.forEach(p => {
       hcpMap[p.id] = p.hcp != null ? String(p.hcp) : ''
-      nickMap[p.id] = (p.nicknames ?? []).join(', ')
+      nickMap[p.id] = ''
     })
     setHcpEdits(hcpMap)
     setNicknameEdits(nickMap)
@@ -137,12 +137,23 @@ export default function PlayersPage() {
     setUploadingFor(null)
   }
 
-  async function saveNicknames(playerId: string) {
-    const raw = nicknameEdits[playerId] ?? ''
-    const nicknames = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+  async function addAlias(playerId: string, raw: string) {
+    const alias = raw.trim().toLowerCase()
+    if (!alias) return
+    const existing = players.find(p => p.id === playerId)?.nicknames ?? []
+    if (existing.includes(alias)) { setNicknameEdits(prev => ({ ...prev, [playerId]: '' })); return }
     setSavingNicknames(playerId)
-    const { error } = await db.from('players').update({ nicknames }).eq('id', playerId)
-    if (error) toast.error('Failed to save aliases')
+    const { error } = await db.from('players').update({ nicknames: [...existing, alias] }).eq('id', playerId)
+    if (error) toast.error('Failed to save alias')
+    else { setNicknameEdits(prev => ({ ...prev, [playerId]: '' })); await loadPlayers() }
+    setSavingNicknames(null)
+  }
+
+  async function removeAlias(playerId: string, alias: string) {
+    const existing = players.find(p => p.id === playerId)?.nicknames ?? []
+    setSavingNicknames(playerId)
+    const { error } = await db.from('players').update({ nicknames: existing.filter(n => n !== alias) }).eq('id', playerId)
+    if (error) toast.error('Failed to remove alias')
     else await loadPlayers()
     setSavingNicknames(null)
   }
@@ -378,7 +389,7 @@ export default function PlayersPage() {
                           }}
                         />
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                         <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', textAlign: 'center' }}>
                           OCR Aliases
                         </span>
@@ -386,11 +397,25 @@ export default function PlayersPage() {
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
                             {(p.nicknames ?? []).map(alias => (
                               <span key={alias} style={{
-                                padding: '2px 7px', borderRadius: 4,
+                                display: 'inline-flex', alignItems: 'center', gap: 3,
+                                padding: '3px 5px 3px 8px', borderRadius: 5,
                                 background: 'var(--tour-navy)', color: '#F5EFE0',
                                 fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
                               }}>
                                 {alias}
+                                <button
+                                  onClick={() => removeAlias(p.id, alias)}
+                                  disabled={savingNicknames === p.id}
+                                  aria-label={`Remove alias ${alias}`}
+                                  style={{
+                                    width: 14, height: 14, borderRadius: '50%', border: 0,
+                                    background: 'rgba(255,255,255,.22)', color: '#fff',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    padding: 0, flexShrink: 0,
+                                  }}
+                                >
+                                  <X size={8} strokeWidth={3} />
+                                </button>
                               </span>
                             ))}
                           </div>
@@ -399,13 +424,14 @@ export default function PlayersPage() {
                           type="text"
                           value={nicknameEdits[p.id] ?? ''}
                           onChange={e => setNicknameEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
-                          onBlur={() => saveNicknames(p.id)}
-                          placeholder={(p.nicknames ?? []).length === 0 ? 'Add aliases…' : 'Edit aliases…'}
+                          onKeyDown={e => { if (e.key === 'Enter') addAlias(p.id, nicknameEdits[p.id] ?? '') }}
+                          onBlur={() => { if (nicknameEdits[p.id]?.trim()) addAlias(p.id, nicknameEdits[p.id] ?? '') }}
+                          placeholder="+ add alias"
                           disabled={savingNicknames === p.id}
                           style={{
                             width: '100%', height: 26, padding: '0 8px', textAlign: 'center',
-                            borderRadius: 6, border: '1px solid var(--bunker-sand-deep)',
-                            background: 'var(--bunker-sand)', color: 'var(--ink-soft)',
+                            borderRadius: 6, border: '1px dashed var(--bunker-sand-deep)',
+                            background: 'transparent', color: 'var(--ink-soft)',
                             fontFamily: 'var(--font-mono)', fontSize: 10,
                             outline: 'none', boxSizing: 'border-box',
                           }}
