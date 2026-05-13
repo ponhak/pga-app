@@ -622,25 +622,27 @@ export default function DashboardPage() {
             {standings.map((s, i) => {
               const isLeader  = i === 0 && hasData
               const isExpanded = expandedId === s.player.id
-              const rowBg = isLeader ? 'rgba(201,162,74,.15)' : 'transparent'
+              const rowBg = isExpanded ? 'rgba(201,162,74,.10)' : isLeader ? 'rgba(201,162,74,.15)' : 'transparent'
               return (
                 <div key={s.player.id}>
                   <div
                     onClick={() => setExpandedId(isExpanded ? null : s.player.id)}
                     style={{
                       display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px 28px',
-                      alignItems: 'center', height: 52, padding: '0 14px',
+                      alignItems: 'center', height: 52,
+                      paddingLeft: 0, paddingRight: 14, paddingTop: 0, paddingBottom: 0,
                       background: rowBg, color: '#F5EFE0',
                       borderBottom: isExpanded ? 'none' : '1px solid rgba(255,255,255,.06)',
+                      borderLeft: isExpanded ? '3px solid var(--trophy-gold)' : '3px solid transparent',
                       cursor: 'pointer',
                     }}
                   >
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: isLeader ? 'var(--trophy-gold)' : '#B9C5D9' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: isLeader || isExpanded ? 'var(--trophy-gold)' : '#B9C5D9', paddingLeft: 11 }}>
                       {i + 1}
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                      <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={28} gold={isLeader} />
-                      <span style={{ fontWeight: 500, fontSize: 15, color: '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={28} gold={isLeader || isExpanded} />
+                      <span style={{ fontWeight: 500, fontSize: 15, color: isExpanded ? 'var(--trophy-gold)' : '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {s.player.name}
                       </span>
                     </span>
