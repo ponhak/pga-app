@@ -61,6 +61,12 @@ export default function LoginPage() {
             Request access
           </Link>
         </p>
+
+        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-faint)', marginTop: 0 }}>
+          <Link href="/forgot-password" style={{ color: 'var(--ink-soft)', textDecoration: 'none' }}>
+            Forgot password?
+          </Link>
+        </p>
       </form>
     </div>
   )
