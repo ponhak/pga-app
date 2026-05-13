@@ -3,9 +3,8 @@
 export const dynamic = 'force-dynamic'
 
 import { useRouter } from 'next/navigation'
-import { ShieldCheck, Users, Database, CalendarDays, ChevronRight } from 'lucide-react'
+import { ShieldCheck, Users, Database, CalendarDays, ChevronRight, UserCog } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
-import { ADMIN_EMAIL } from '@/lib/auth'
 
 interface AdminCard {
   href: string
@@ -16,31 +15,23 @@ interface AdminCard {
 
 const CARDS: AdminCard[] = [
   { href: '/admin/members',  Icon: ShieldCheck,  label: 'Approved Members',    desc: 'Control who can sign up and access the app' },
+  { href: '/admin/users',    Icon: UserCog,      label: 'User Roles',          desc: 'Grant or revoke admin rights for members' },
   { href: '/players',        Icon: Users,         label: 'Field',               desc: 'Add or remove players from the roster' },
   { href: '/admin/data',     Icon: Database,      label: 'Manage Data',         desc: 'Add historical rounds and correct results' },
   { href: '/admin/planning', Icon: CalendarDays,  label: 'Seasonal Planning',   desc: 'Plan and configure the upcoming season' },
 ]
 
 export default function AdminHubPage() {
-  const { session, loading } = useAuth()
+  const { session, loading, isAdmin } = useAuth()
   const router = useRouter()
 
   if (loading) return null
 
-  if (!session) {
+  if (!session || !isAdmin) {
     return (
       <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--ink-soft)' }}>
         <ShieldCheck size={40} strokeWidth={1.5} style={{ margin: '0 auto 12px', color: 'var(--ink-faint)' }} />
-        <p style={{ fontSize: 15 }}>You need to be signed in to access this page.</p>
-      </div>
-    )
-  }
-
-  if (session.user.email !== ADMIN_EMAIL) {
-    return (
-      <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--ink-soft)' }}>
-        <ShieldCheck size={40} strokeWidth={1.5} style={{ margin: '0 auto 12px', color: 'var(--ink-faint)' }} />
-        <p style={{ fontSize: 15 }}>Access denied.</p>
+        <p style={{ fontSize: 15 }}>{!session ? 'You need to be signed in to access this page.' : 'Access denied.'}</p>
       </div>
     )
   }

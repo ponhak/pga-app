@@ -5,12 +5,11 @@ import { usePathname, useRouter } from 'next/navigation'
 import { UserCircle, LogIn, LogOut, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
-import { ADMIN_EMAIL } from '@/lib/auth'
 
 export function NavBar() {
   const pathname = usePathname()
   const router   = useRouter()
-  const { session } = useAuth()
+  const { session, isAdmin } = useAuth()
   const isHome = pathname === '/'
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -182,7 +181,7 @@ export function NavBar() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{firstName}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 2, wordBreak: 'break-all' }}>{session.user.email}</div>
                 </div>
-                {session.user.email === ADMIN_EMAIL && (
+                {isAdmin && (
                   <button
                     onClick={() => { setMenuOpen(false); router.push('/admin') }}
                     style={menuItem()}

@@ -9,8 +9,6 @@ import { toast } from 'sonner'
 import { Camera, Search, X, Plus, ChevronLeft } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { useRouter } from 'next/navigation'
-import { ADMIN_EMAIL } from '@/lib/auth'
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
 
@@ -42,9 +40,8 @@ function getInitials(name: string) {
 }
 
 export default function PlayersPage() {
-  const { session } = useAuth()
+  const { session, isAdmin } = useAuth()
   const router = useRouter()
-  const isAdmin = session?.user.email === ADMIN_EMAIL
 
   const [players, setPlayers] = useState<Player[]>([])
   const [newName, setNewName] = useState('')

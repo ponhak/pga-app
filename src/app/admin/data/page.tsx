@@ -11,8 +11,6 @@ import { ShieldCheck, ChevronLeft, Plus, ChevronRight, Pencil, Trash2, X, Check 
 import type { Round, Player, Score } from '@/lib/database.types'
 import { assignPoints } from '@/lib/points'
 import Link from 'next/link'
-import { ADMIN_EMAIL } from '@/lib/auth'
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
 
@@ -34,7 +32,7 @@ function textInput(style: React.CSSProperties = {}): React.CSSProperties {
 }
 
 export default function ManageDataPage() {
-  const { session, loading } = useAuth()
+  const { session, loading, isAdmin } = useAuth()
   const router = useRouter()
 
   const [allRounds, setAllRounds] = useState<RoundRow[]>([])
@@ -57,10 +55,9 @@ export default function ManageDataPage() {
   const [histScores, setHistScores] = useState<Record<string, string>>({})
   const [histSaving, setHistSaving] = useState(false)
 
-  const isAdmin = session?.user.email === ADMIN_EMAIL
-
   useEffect(() => {
     if (isAdmin) loadAll()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 
   async function loadAll() {

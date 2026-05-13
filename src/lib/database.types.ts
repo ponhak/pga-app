@@ -2,9 +2,9 @@ export interface Database {
   public: {
     Tables: {
       allowed_emails: {
-        Row: { email: string; added_at: string }
-        Insert: { email: string; added_at?: string }
-        Update: { email?: string; added_at?: string }
+        Row: { email: string; added_at: string; is_admin: boolean }
+        Insert: { email: string; added_at?: string; is_admin?: boolean }
+        Update: { email?: string; added_at?: string; is_admin?: boolean }
       }
       profiles: {
         Row: { id: string; name: string; phone: string | null }
