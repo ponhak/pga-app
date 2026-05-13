@@ -16,8 +16,8 @@ const db = supabase as any
 
 // ── Scorecard OCR helpers ────────────────────────────────────────────────────
 
-// App nickname → GolfGameBook real first names
-const NICKNAMES: Record<string, string[]> = {
+// Fallback hardcoded nicknames (alias → player real name words)
+const BASE_NICKNAMES: Record<string, string[]> = {
   bulan: ['kristoffer'],
   champ: ['nicklas'],
   hasse: ['hans'],
@@ -132,7 +132,7 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
     .filter(r => r.strokes >= 55 && r.strokes <= 160)
 }
 
-function matchScorecardName(scorecardName: string, playerNames: string[]): string | null {
+function matchScorecardName(scorecardName: string, playerNames: string[], nicknames: Record<string, string[]>): string | null {
   // Check every word in the scorecard name against every word in each player name
   const scWords = scorecardName.toLowerCase().split(/\s+/)
   for (const pName of playerNames) {
@@ -140,8 +140,8 @@ function matchScorecardName(scorecardName: string, playerNames: string[]): strin
     for (const sc of scWords) {
       for (const pw of pWords) {
         if (sc === pw) return pName
-        if ((NICKNAMES[pw] ?? []).includes(sc)) return pName
-        if ((NICKNAMES[sc] ?? []).includes(pw)) return pName
+        if ((nicknames[pw] ?? []).includes(sc)) return pName
+        if ((nicknames[sc] ?? []).includes(pw)) return pName
       }
     }
   }
@@ -188,6 +188,8 @@ export default function RoundPage() {
   const [saving, setSaving] = useState(false)
   const [scanning, setScanning] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [mergedNicknames, setMergedNicknames] = useState<Record<string, string[]>>(BASE_NICKNAMES)
 
   // Setup (pre-start) state
   const [allPlayers, setAllPlayers] = useState<Player[]>([])
@@ -255,6 +257,22 @@ export default function RoundPage() {
 
     const ap = (allPlayersData ?? []) as Player[]
     setAllPlayers(ap)
+
+    // Build merged nickname map: base hardcoded + DB-stored aliases
+    const dbMap: Record<string, string[]> = {}
+    for (const p of ap) {
+      const aliases = p.nicknames ?? []
+      const realWords = p.name.toLowerCase().split(/\s+/)
+      for (const alias of aliases) {
+        const key = alias.toLowerCase()
+        dbMap[key] = [...(dbMap[key] ?? []), ...realWords]
+      }
+    }
+    const merged: Record<string, string[]> = { ...BASE_NICKNAMES }
+    for (const [k, v] of Object.entries(dbMap)) {
+      merged[k] = [...(merged[k] ?? []), ...v]
+    }
+    setMergedNicknames(merged)
 
     // Pre-select all players in setup mode if no players assigned yet
     if (loadedPlayers.length === 0) {
@@ -352,6 +370,13 @@ export default function RoundPage() {
 
     if (entries.length === 0) { toast.error('Enter at least one score'); return }
 
+    const invalid = entries.filter(e => e.strokes < 50 || e.strokes > 160)
+    if (invalid.length > 0) {
+      const names = invalid.map(e => players.find(p => p.id === e.playerId)?.name ?? e.playerId)
+      toast.error(`Invalid score for ${names.join(', ')} — must be 50–160`)
+      return
+    }
+
     const entryIds = new Set(entries.map(e => e.playerId))
     const dnfPlayers = [...players.filter(p => !entryIds.has(p.id))].sort(() => Math.random() - 0.5)
 
@@ -432,7 +457,7 @@ export default function RoundPage() {
       const unmatched: string[] = []
       let count = 0
       for (const { name, strokes, hcp, netDiff } of extracted) {
-        const playerName = matchScorecardName(name, playerNames)
+        const playerName = matchScorecardName(name, playerNames, mergedNicknames)
         if (!playerName) { unmatched.push(`${name}(${strokes})`); continue }
         const player = players.find(p => p.name === playerName)
         if (player && !matched[player.id]) {

@@ -21,6 +21,7 @@ interface RoundEntry {
   double_points: boolean
   playerCount: number
   hasScores: boolean
+  blockedCount: number
 }
 
 type Status = 'upcoming' | 'pending' | 'scored'
@@ -79,6 +80,23 @@ export default function SchedulePage() {
       if (s.strokes != null) hasScoresMap[s.round_id] = true
     })
 
+    const upcomingDates = (roundsData ?? [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((r: any) => !hasScoresMap[r.id] && r.date >= today)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((r: any) => r.date as string)
+
+    const blockedMap: Record<string, number> = {}
+    if (upcomingDates.length > 0) {
+      const { data: blocks } = await db
+        .from('availability_blocks')
+        .select('date')
+        .in('date', upcomingDates)
+      ;(blocks ?? []).forEach((b: { date: string }) => {
+        blockedMap[b.date] = (blockedMap[b.date] ?? 0) + 1
+      })
+    }
+
     setRounds(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (roundsData ?? []).map((r: any) => ({
@@ -86,6 +104,7 @@ export default function SchedulePage() {
         double_points: r.double_points ?? false,
         playerCount: rpCount[r.id] ?? 0,
         hasScores: hasScoresMap[r.id] ?? false,
+        blockedCount: blockedMap[r.date] ?? 0,
       }))
     )
     setLoading(false)
@@ -181,6 +200,16 @@ export default function SchedulePage() {
                     ) : (
                       <div style={{ fontSize: 12, color: 'var(--ink-faint)', marginTop: 2 }}>
                         {entry.playerCount > 0 ? `${entry.playerCount} players · ${entry.group_size}-ball` : `${entry.group_size}-ball groups`}
+                      </div>
+                    )}
+                    {status === 'upcoming' && entry.blockedCount > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, letterSpacing: '.06em',
+                          color: entry.blockedCount >= 2 ? 'var(--tournament-red)' : '#B07800',
+                        }}>
+                          ⚠ {entry.blockedCount} unavailable
+                        </span>
                       </div>
                     )}
                   </div>

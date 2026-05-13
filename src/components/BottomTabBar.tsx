@@ -31,13 +31,15 @@ export function BottomTabBar() {
         left: 0,
         right: 0,
         zIndex: 10,
-        height: 64,
+        height: 'calc(64px + env(safe-area-inset-bottom, 0px))',
         background: 'rgba(10,34,64,.94)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         borderTop: '1px solid rgba(255,255,255,.10)',
         display: 'grid',
         gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
+        alignItems: 'start',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
       {tabs.map(({ id, href, label, Icon }) => {

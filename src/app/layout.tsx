@@ -30,6 +30,12 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: 'PGA Schager',
   description: 'Friendly golf tournament tracker',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'PGA Schager',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -41,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full flex flex-col bg-background" style={{ fontFamily: 'var(--font-body)' }}>
         <AuthProvider>
           <NavBar />
-          <main className="flex-1 max-w-2xl mx-auto w-full pb-20">
+          <main className="flex-1 max-w-2xl mx-auto w-full" style={{ paddingBottom: 'max(80px, calc(64px + env(safe-area-inset-bottom, 0px)))' }}>
             {children}
           </main>
           <BottomTabBar />

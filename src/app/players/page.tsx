@@ -52,6 +52,8 @@ export default function PlayersPage() {
 
   const [hcpEdits, setHcpEdits] = useState<Record<string, string>>({})
   const [savingHcp, setSavingHcp] = useState<string | null>(null)
+  const [nicknameEdits, setNicknameEdits] = useState<Record<string, string>>({})
+  const [savingNicknames, setSavingNicknames] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
@@ -63,9 +65,14 @@ export default function PlayersPage() {
     if (error) { toast.error('Failed to load players'); return }
     const list = (data as Player[]) ?? []
     setPlayers(list)
-    const map: Record<string, string> = {}
-    list.forEach(p => { map[p.id] = p.hcp != null ? String(p.hcp) : '' })
-    setHcpEdits(map)
+    const hcpMap: Record<string, string> = {}
+    const nickMap: Record<string, string> = {}
+    list.forEach(p => {
+      hcpMap[p.id] = p.hcp != null ? String(p.hcp) : ''
+      nickMap[p.id] = (p.nicknames ?? []).join(', ')
+    })
+    setHcpEdits(hcpMap)
+    setNicknameEdits(nickMap)
     setLoading(false)
   }
 
@@ -128,6 +135,16 @@ export default function PlayersPage() {
       await loadPlayers()
     }
     setUploadingFor(null)
+  }
+
+  async function saveNicknames(playerId: string) {
+    const raw = nicknameEdits[playerId] ?? ''
+    const nicknames = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    setSavingNicknames(playerId)
+    const { error } = await db.from('players').update({ nicknames }).eq('id', playerId)
+    if (error) toast.error('Failed to save aliases')
+    else await loadPlayers()
+    setSavingNicknames(null)
   }
 
   async function saveHcp(playerId: string) {
@@ -338,27 +355,49 @@ export default function PlayersPage() {
 
                   {/* HCP row (admin only) */}
                   {isAdmin ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 12px 12px' }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
-                        HCP
-                      </span>
-                      <input
-                        type="number"
-                        min={0} max={54} step={0.1}
-                        value={hcpEdits[p.id] ?? ''}
-                        onChange={e => setHcpEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
-                        onBlur={() => saveHcp(p.id)}
-                        placeholder="—"
-                        disabled={savingHcp === p.id}
-                        style={{
-                          width: 54, height: 28, textAlign: 'center',
-                          borderRadius: 6, border: '1px solid var(--bunker-sand-deep)',
-                          background: hcpEdits[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)',
-                          color: hcpEdits[p.id] ? '#F5EFE0' : 'var(--ink)',
-                          fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 14,
-                          outline: 'none', boxSizing: 'border-box',
-                        }}
-                      />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px 12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+                          HCP
+                        </span>
+                        <input
+                          type="number"
+                          min={0} max={54} step={0.1}
+                          value={hcpEdits[p.id] ?? ''}
+                          onChange={e => setHcpEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          onBlur={() => saveHcp(p.id)}
+                          placeholder="—"
+                          disabled={savingHcp === p.id}
+                          style={{
+                            width: 54, height: 28, textAlign: 'center',
+                            borderRadius: 6, border: '1px solid var(--bunker-sand-deep)',
+                            background: hcpEdits[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)',
+                            color: hcpEdits[p.id] ? '#F5EFE0' : 'var(--ink)',
+                            fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 14,
+                            outline: 'none', boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', textAlign: 'center' }}>
+                          OCR Aliases
+                        </span>
+                        <input
+                          type="text"
+                          value={nicknameEdits[p.id] ?? ''}
+                          onChange={e => setNicknameEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          onBlur={() => saveNicknames(p.id)}
+                          placeholder="e.g. bulan, kris"
+                          disabled={savingNicknames === p.id}
+                          style={{
+                            width: '100%', height: 26, padding: '0 8px', textAlign: 'center',
+                            borderRadius: 6, border: '1px solid var(--bunker-sand-deep)',
+                            background: 'var(--bunker-sand)', color: 'var(--ink)',
+                            fontFamily: 'var(--font-mono)', fontSize: 11,
+                            outline: 'none', boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div style={{ height: 12 }} />

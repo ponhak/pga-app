@@ -52,6 +52,7 @@ function formatPts(n: number) {
 export default function DashboardPage() {
   const [standings, setStandings] = useState<Standing[]>([])
   const [recentRounds, setRecentRounds] = useState<RecentRound[]>([])
+  const [todayRound, setTodayRound] = useState<Round | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -111,6 +112,12 @@ export default function DashboardPage() {
     typedRP.forEach((rp) => {
       rpByRound[rp.round_id] = (rpByRound[rp.round_id] ?? 0) + 1
     })
+
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const found = typedRounds.find(
+      r => r.date === todayStr && !(scoresByRound[r.id] ?? []).some(s => s.strokes != null)
+    )
+    setTodayRound(found ?? null)
 
     setRecentRounds(typedRounds.map((r) => ({
       round: r,
@@ -178,6 +185,29 @@ export default function DashboardPage() {
             )}
           </div>
       </section>
+
+      {/* ── Round today banner ── */}
+      {todayRound && (
+        <div
+          onClick={() => router.push(`/rounds/${todayRound.id}`)}
+          style={{
+            background: 'var(--tournament-red)',
+            padding: '14px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            cursor: 'pointer',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,.70)', marginBottom: 2 }}>
+              Today
+            </div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, textTransform: 'uppercase', letterSpacing: '.02em', color: '#fff' }}>
+              Round Day — Open Scorecard
+            </div>
+          </div>
+          <ChevronRight size={20} color="rgba(255,255,255,.80)" strokeWidth={2.5} />
+        </div>
+      )}
 
       {/* ── Next round countdown ── */}
       <NextRoundCountdown playerCount={standings.length} />

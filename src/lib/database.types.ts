@@ -12,9 +12,9 @@ export interface Database {
         Update: { id?: string; name?: string; phone?: string | null }
       }
       players: {
-        Row: { id: string; name: string; created_at: string; avatar_url: string | null; hcp: number | null }
-        Insert: { id?: string; name: string; created_at?: string; avatar_url?: string | null; hcp?: number | null }
-        Update: { id?: string; name?: string; created_at?: string; avatar_url?: string | null; hcp?: number | null }
+        Row: { id: string; name: string; created_at: string; avatar_url: string | null; hcp: number | null; nicknames: string[] | null }
+        Insert: { id?: string; name: string; created_at?: string; avatar_url?: string | null; hcp?: number | null; nicknames?: string[] | null }
+        Update: { id?: string; name?: string; created_at?: string; avatar_url?: string | null; hcp?: number | null; nicknames?: string[] | null }
       }
       rounds: {
         Row: { id: string; date: string; group_size: number; notes: string | null; tee_time: string | null; double_points: boolean; created_at: string }

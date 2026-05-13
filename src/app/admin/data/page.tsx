@@ -117,13 +117,19 @@ export default function ManageDataPage() {
     if (!editId) return
     const entries = editRoundPlayers
       .filter(p => editRoundScores[p.id]?.trim() !== '' && editRoundScores[p.id] != null)
-      .map(p => ({ playerId: p.id, strokes: parseInt(editRoundScores[p.id]) }))
+      .map(p => ({ playerId: p.id, name: p.name, strokes: parseInt(editRoundScores[p.id]) }))
       .filter(s => !isNaN(s.strokes) && s.strokes > 0)
+
+    const invalid = entries.filter(s => s.strokes < 50 || s.strokes > 160)
+    if (invalid.length > 0) {
+      toast.error(`Invalid score for ${invalid.map(s => s.name).join(', ')} — must be 50–160`)
+      return
+    }
 
     if (entries.length < 2) { toast.error('Enter at least 2 net scores'); return }
 
     setEditScoreSaving(true)
-    const results = assignPoints(entries)
+    const results = assignPoints(entries.map(({ playerId, strokes }) => ({ playerId, strokes })))
     const upserts = results.map(r => ({
       round_id:      editId,
       player_id:     r.playerId,
@@ -188,10 +194,18 @@ export default function ManageDataPage() {
   async function saveHistorical(e: React.FormEvent) {
     e.preventDefault()
 
-    const scoreInputs = players
+    const scoreInputsRaw = players
       .filter(p => histScores[p.id]?.trim() !== '' && histScores[p.id] != null)
-      .map(p => ({ playerId: p.id, strokes: parseInt(histScores[p.id]) }))
+      .map(p => ({ playerId: p.id, name: p.name, strokes: parseInt(histScores[p.id]) }))
       .filter(s => !isNaN(s.strokes) && s.strokes > 0)
+
+    const invalidHist = scoreInputsRaw.filter(s => s.strokes < 50 || s.strokes > 160)
+    if (invalidHist.length > 0) {
+      toast.error(`Invalid score for ${invalidHist.map(s => s.name).join(', ')} — must be 50–160`)
+      return
+    }
+
+    const scoreInputs = scoreInputsRaw.map(({ playerId, strokes }) => ({ playerId, strokes }))
 
     if (scoreInputs.length < 2) {
       toast.error('Enter net scores for at least 2 players')
