@@ -378,22 +378,35 @@ export default function PlayersPage() {
                           }}
                         />
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', textAlign: 'center' }}>
                           OCR Aliases
                         </span>
+                        {(p.nicknames ?? []).length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
+                            {(p.nicknames ?? []).map(alias => (
+                              <span key={alias} style={{
+                                padding: '2px 7px', borderRadius: 4,
+                                background: 'var(--tour-navy)', color: '#F5EFE0',
+                                fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
+                              }}>
+                                {alias}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <input
                           type="text"
                           value={nicknameEdits[p.id] ?? ''}
                           onChange={e => setNicknameEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
                           onBlur={() => saveNicknames(p.id)}
-                          placeholder="e.g. bulan, kris"
+                          placeholder={(p.nicknames ?? []).length === 0 ? 'Add aliases…' : 'Edit aliases…'}
                           disabled={savingNicknames === p.id}
                           style={{
                             width: '100%', height: 26, padding: '0 8px', textAlign: 'center',
                             borderRadius: 6, border: '1px solid var(--bunker-sand-deep)',
-                            background: 'var(--bunker-sand)', color: 'var(--ink)',
-                            fontFamily: 'var(--font-mono)', fontSize: 11,
+                            background: 'var(--bunker-sand)', color: 'var(--ink-soft)',
+                            fontFamily: 'var(--font-mono)', fontSize: 10,
                             outline: 'none', boxSizing: 'border-box',
                           }}
                         />
