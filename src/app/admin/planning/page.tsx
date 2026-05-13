@@ -20,6 +20,12 @@ interface PlanRound {
   linked_round_id: string | null  // tracks the corresponding schedule round
 }
 
+function availabilityBg(count: number): string {
+  if (count >= 2) return 'rgba(200,16,46,.18)'
+  if (count === 1) return 'rgba(201,162,74,.32)'
+  return '#fff'
+}
+
 function inputStyle(overrides?: React.CSSProperties): React.CSSProperties {
   return {
     height: 36, padding: '0 10px',
@@ -46,6 +52,7 @@ export default function PlanningPage() {
   const [saving, setSaving]   = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
+  const [blockMap, setBlockMap] = useState<Record<string, number>>({})
 
   const isSynced = planRounds.some(r => r.linked_round_id)
 
@@ -57,6 +64,19 @@ export default function PlanningPage() {
   async function loadPlan(y: number) {
     setDataLoaded(false)
     setPendingDeletions([])
+
+    // Load availability blocks for this year to colour-code date inputs
+    const { data: blocks } = await db
+      .from('availability_blocks')
+      .select('date')
+      .gte('date', `${y}-01-01`)
+      .lte('date', `${y}-12-31`)
+    const map: Record<string, number> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const b of (blocks ?? []) as any[]) {
+      map[b.date] = (map[b.date] ?? 0) + 1
+    }
+    setBlockMap(map)
     const { data: planArr } = await db
       .from('season_plans')
       .select('*')
@@ -453,7 +473,7 @@ export default function PlanningPage() {
                     type="date"
                     value={r.date}
                     onChange={e => updateRound(i, { date: e.target.value })}
-                    style={{ ...inputStyle(), width: '100%', colorScheme: 'light' }}
+                    style={{ ...inputStyle({ background: r.date ? availabilityBg(blockMap[r.date] ?? 0) : '#fff' }), width: '100%', colorScheme: 'light' }}
                   />
                   <button
                     type="button"
