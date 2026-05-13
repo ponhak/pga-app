@@ -165,22 +165,37 @@ export default function DashboardPage() {
           <>
             <div style={{ position: 'relative', height: 280, overflow: 'hidden', background: 'var(--tour-navy)' }}>
 
-              {/* Player photo — left/center */}
+              {/* Owl torso watermark — left side, behind everything */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/owl-torso.png"
+                alt=""
+                aria-hidden
+                style={{
+                  position: 'absolute', left: '-25%', top: '50%', transform: 'translateY(-50%)',
+                  height: '130%', width: 'auto', maxWidth: 'none',
+                  opacity: 0.12, pointerEvents: 'none',
+                }}
+              />
+
+              {/* Player photo — centered */}
               {leader.player.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={leader.player.avatar_url}
                   alt={leader.player.name}
                   style={{
-                    position: 'absolute', left: '-8%', top: 0,
-                    height: '100%', width: '72%',
+                    position: 'absolute', left: '50%', top: 0,
+                    transform: 'translateX(-50%)',
+                    height: '100%', width: '56%',
                     objectFit: 'cover', objectPosition: 'top center',
                   }}
                 />
               ) : (
                 <div style={{
-                  position: 'absolute', left: 0, top: 0,
-                  height: '100%', width: '60%',
+                  position: 'absolute', left: '50%', top: 0,
+                  transform: 'translateX(-50%)',
+                  height: '100%', width: '56%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontFamily: 'var(--font-display)', fontSize: 120, fontWeight: 700,
                   color: 'rgba(255,255,255,.08)', lineHeight: 1, userSelect: 'none',
@@ -189,30 +204,23 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Gradient: photo right edge → navy */}
-              <div style={{
-                position: 'absolute', left: '42%', top: 0, bottom: 0, width: '18%',
-                background: 'linear-gradient(to right, transparent, #0A2240)',
-                pointerEvents: 'none',
-              }} />
-
-              {/* Bottom gradient — lighter so player is less faded */}
+              {/* Bottom gradient */}
               <div style={{
                 position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%',
                 background: 'linear-gradient(to top, rgba(10,34,64,.75) 0%, transparent 100%)',
                 pointerEvents: 'none',
               }} />
 
-              {/* Trophy — in front of player, bottom-aligned */}
+              {/* Trophy — right of player, in front */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/owl-trophy.png"
                 alt="Trophy"
                 style={{
-                  position: 'absolute', right: 8, bottom: '-6%',
+                  position: 'absolute', right: '-12%', bottom: '-6%',
                   height: '106%', width: 'auto',
-                  opacity: 0.30,
-                  filter: 'drop-shadow(0 4px 12px rgba(0,0,0,.4))',
+                  opacity: 0.12,
+                  pointerEvents: 'none',
                 }}
               />
 
