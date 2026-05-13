@@ -10,6 +10,7 @@ import type { Player, Round, Score } from '@/lib/database.types'
 import { toast } from 'sonner'
 import { ChevronLeft, Save, ScanLine, Loader2, Shuffle, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -154,23 +155,6 @@ interface GroupWithMembers {
   members: Player[]
 }
 
-function Avatar({ initials, size = 28 }: { initials: string; size?: number }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: 'var(--tour-navy)', color: '#F5EFE0',
-      fontFamily: 'var(--font-display)', fontWeight: 700,
-      fontSize: size * 0.42, letterSpacing: '.04em',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {initials}
-    </div>
-  )
-}
-
-function getInitials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-}
 
 export default function RoundPage() {
   const { id } = useParams<{ id: string }>()
@@ -785,7 +769,7 @@ export default function RoundPage() {
                       <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
                         {group.map(pid => (
                           <li key={pid} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Avatar initials={getInitials(nameOf(pid))} size={22} />
+                            <PlayerAvatar name={nameOf(pid)} avatarUrl={allPlayers.find(p => p.id === pid)?.avatar_url} size={22} />
                             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)' }}>{nameOf(pid)}</span>
                           </li>
                         ))}
@@ -905,7 +889,7 @@ export default function RoundPage() {
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {g.members.map(m => (
                     <li key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Avatar initials={getInitials(m.name)} size={24} />
+                      <PlayerAvatar name={m.name} avatarUrl={m.avatar_url} size={24} />
                       <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{m.name}</span>
                     </li>
                   ))}
@@ -969,7 +953,7 @@ export default function RoundPage() {
                       {isDnf ? 'DNF' : s.rank}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                      <Avatar initials={player ? getInitials(player.name) : '?'} size={26} />
+                      <PlayerAvatar name={player?.name ?? '?'} avatarUrl={player?.avatar_url} size={26} />
                       <span style={{ fontSize: 14, fontWeight: 500, color: isDnf ? 'var(--ink-soft)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player?.name ?? '?'}</span>
                     </div>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--ink-faint)', textAlign: 'center' }}>{isDnf ? '—' : (gross ?? '—')}</span>
@@ -1003,7 +987,7 @@ export default function RoundPage() {
                 return (
                   <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px', alignItems: 'center', padding: '9px 14px', borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                      <Avatar initials={getInitials(p.name)} size={28} />
+                      <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={28} />
                       <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
                     </div>
                     <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 15, color: gross != null ? 'var(--ink-soft)' : 'var(--ink-faint)' }}>{gross ?? '—'}</div>

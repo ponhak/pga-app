@@ -9,35 +9,10 @@ import { toast } from 'sonner'
 import { Camera, Search, X, Plus, ChevronLeft } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { useRouter } from 'next/navigation'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
 
-function PlayerAvatar({ url, initials, size = 48 }: { url: string | null; initials: string; size?: number }) {
-  if (url) {
-    return (
-      <img
-        src={url}
-        alt={initials}
-        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-      />
-    )
-  }
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: 'var(--tour-navy)', color: '#F5EFE0',
-      fontFamily: 'var(--font-display)', fontWeight: 700,
-      fontSize: size * 0.38, letterSpacing: '.04em',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {initials}
-    </div>
-  )
-}
-
-function getInitials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-}
 
 export default function PlayersPage() {
   const { session, isAdmin } = useAuth()
@@ -326,7 +301,7 @@ export default function PlayersPage() {
                       onClick={() => isAdmin && triggerAvatarUpload(p.id)}
                       style={{ position: 'relative', cursor: isAdmin ? 'pointer' : 'default' }}
                     >
-                      <PlayerAvatar url={p.avatar_url ?? null} initials={getInitials(p.name)} size={72} />
+                      <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={72} />
                       {isAdmin && (
                         <div style={{
                           position: 'absolute', bottom: 0, right: 0,

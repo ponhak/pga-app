@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { Trophy, ChevronDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Player, Score } from '@/lib/database.types'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -14,6 +15,7 @@ interface Standing {
   rank: number
   name: string
   initials: string
+  avatarUrl: string | null
   rounds: number
   wins: number
   points: number
@@ -34,21 +36,6 @@ function fmt(n: number) {
 
 const ORDINALS: Record<number, string> = { 1: '1ST', 2: '2ND', 3: '3RD' }
 function ordinal(n: number) { return ORDINALS[n] ?? `${n}TH` }
-
-function Avatar({ initials, size = 28, gold = false }: { initials: string; size?: number; gold?: boolean }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: gold ? 'var(--trophy-gold)' : 'var(--tour-navy)',
-      color: gold ? 'var(--tour-navy)' : '#F5EFE0',
-      fontFamily: 'var(--font-display)', fontWeight: 700,
-      fontSize: size * 0.42, letterSpacing: '.04em',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {initials}
-    </div>
-  )
-}
 
 const PILL_COUNT = 3
 
@@ -98,7 +85,7 @@ export default function HistoryPage() {
         const standings: Standing[] = Object.entries(agg)
           .map(([pid, data]) => {
             const player = typedPlayers.find(p => p.id === pid)
-            return { name: player?.name ?? '?', initials: getInitials(player?.name ?? '?'), ...data }
+            return { name: player?.name ?? '?', initials: getInitials(player?.name ?? '?'), avatarUrl: player?.avatar_url ?? null, ...data }
           })
           .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
           .map((s, i) => ({ ...s, rank: i + 1 }))
@@ -245,15 +232,7 @@ export default function HistoryPage() {
                     <Trophy size={230} strokeWidth={0.7} color="#fff" />
                   </div>
                   <div style={{ position: 'absolute', top: 3, bottom: 60, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                    <div style={{
-                      width: 84, height: 84, borderRadius: '50%',
-                      background: 'rgba(201,162,74,.18)', border: '2.5px solid var(--trophy-gold)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 28,
-                      letterSpacing: '.04em', color: 'var(--trophy-gold)',
-                    }}>
-                      {champion.initials}
-                    </div>
+                    <PlayerAvatar name={champion.name} avatarUrl={champion.avatarUrl} size={84} gold />
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 26, textTransform: 'uppercase', letterSpacing: '.04em', color: '#fff' }}>
                       {champion.name}
                     </div>
@@ -306,7 +285,7 @@ export default function HistoryPage() {
                     <div key={s.name + s.rank} style={{ display: 'grid', gridTemplateColumns: '34px 1fr 70px 70px', alignItems: 'center', height: 52, padding: '0 14px', background: isChamp ? 'rgba(201,162,74,.15)' : 'transparent', color: '#F5EFE0', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, color: isChamp ? 'var(--trophy-gold)' : '#B9C5D9' }}>{s.rank}</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                        <Avatar initials={s.initials} size={28} gold={isChamp} />
+                        <PlayerAvatar name={s.name} avatarUrl={s.avatarUrl} size={28} gold={isChamp} />
                         <span style={{ fontWeight: 500, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
                         {s.wins > 0 && (
                           <span style={{ flexShrink: 0, height: 18, padding: '0 6px', borderRadius: 999, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', background: 'rgba(201,162,74,.25)', color: 'var(--trophy-gold)', display: 'flex', alignItems: 'center' }}>

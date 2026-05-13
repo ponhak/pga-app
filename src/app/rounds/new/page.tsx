@@ -10,27 +10,11 @@ import { randomizeGroups } from '@/lib/points'
 import { toast } from 'sonner'
 import { Shuffle, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
 
-function Avatar({ initials, size = 28 }: { initials: string; size?: number }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: 'var(--tour-navy)', color: '#F5EFE0',
-      fontFamily: 'var(--font-display)', fontWeight: 700,
-      fontSize: size * 0.42, letterSpacing: '.04em',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {initials}
-    </div>
-  )
-}
-
-function getInitials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-}
 
 export default function NewRoundPage() {
   const router = useRouter()
@@ -329,7 +313,7 @@ export default function NewRoundPage() {
                     <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
                       {group.map((pid) => (
                         <li key={pid} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Avatar initials={getInitials(nameOf(pid))} size={22} />
+                          <PlayerAvatar name={nameOf(pid)} avatarUrl={players.find(p => p.id === pid)?.avatar_url} size={22} />
                           <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)' }}>{nameOf(pid)}</span>
                         </li>
                       ))}

@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import type { Player, Round, Score } from '@/lib/database.types'
 import { ChevronRight } from 'lucide-react'
 import { NextRoundCountdown } from '@/components/NextRoundCountdown'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -26,24 +27,6 @@ interface RecentRound {
   hasScores: boolean
 }
 
-function Avatar({ initials, size = 28, gold = false }: { initials: string; size?: number; gold?: boolean }) {
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: gold ? 'var(--trophy-gold)' : 'var(--tour-navy)',
-      color: gold ? 'var(--tour-navy)' : '#F5EFE0',
-      fontFamily: 'var(--font-display)', fontWeight: 700,
-      fontSize: size * 0.42, letterSpacing: '.04em',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {initials}
-    </div>
-  )
-}
-
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-}
 
 function formatPts(n: number) {
   return n % 1 === 0 ? String(n) : n.toFixed(1)
@@ -359,7 +342,7 @@ export default function DashboardPage() {
                     {i + 1}
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                    <Avatar initials={initials(s.player.name)} size={28} gold={isLeader} />
+                    <PlayerAvatar name={s.player.name} avatarUrl={s.player.avatar_url} size={28} gold={isLeader} />
                     <span style={{ fontWeight: 500, fontSize: 15, color: '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {s.player.name}
                     </span>
