@@ -2,17 +2,118 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import { toast } from 'sonner'
-import { ShieldCheck, ChevronLeft, Plus, ChevronRight, Pencil, Trash2, X, Check } from 'lucide-react'
+import { ShieldCheck, ChevronLeft, Plus, ChevronRight, Pencil, Trash2, X, Check, ScanLine, Loader2 } from 'lucide-react'
 import type { Round, Player, Score } from '@/lib/database.types'
 import { assignPoints } from '@/lib/points'
 import Link from 'next/link'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
+
+// ── OCR helpers (same logic as rounds/[id]/page.tsx) ─────────────────────────
+
+const BASE_NICKNAMES: Record<string, string[]> = {
+  bulan: ['kristoffer'],
+  champ: ['nicklas'],
+  hasse: ['hans'],
+  nygren: ['niclas'],
+}
+
+function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hcp: number | null; netDiff: number | null }[] {
+  const lines = ocrText.split('\n').map(l => l.trim()).filter(Boolean)
+  const skipRe        = /slagspel|poangbogey|resultat|spelat|leaderboard|spelinfo|spelflode|johannesberg|donald|steel|\bbook\b|\bgame\b/i
+  const standaloneHcpRe = /^HCP\s*(\d+)$/i
+  const nameOnlyRe    = /^[A-Za-zÅÄÖåäöÉéÜü\s\-]{3,}$/
+  const scoreReHcp    = /HCP\s*(\d+)\s*[^\d\s]?\s*(\d{1,3})\s+([+\-]?\d+)/i
+  const scoreReNoHcp  = /(\d{2,3})\s+([+\-]?\d+)/i
+
+  interface NameEntry  { idx: number; text: string; claimed: boolean }
+  interface HcpEntry   { idx: number; val: number;  claimed: boolean }
+  interface ScoreEntry { idx: number; hcp: number | null; strokes: number; netDiff: number | null; line: string }
+
+  const nameEntries:  NameEntry[]  = []
+  const hcpEntries:   HcpEntry[]   = []
+  const scoreEntries: ScoreEntry[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (/^#/.test(line) || skipRe.test(line)) continue
+    const hcpOnly = line.match(standaloneHcpRe)
+    if (hcpOnly) { hcpEntries.push({ idx: i, val: Number(hcpOnly[1]), claimed: false }); continue }
+    const mHcp = line.match(scoreReHcp)
+    if (mHcp) { scoreEntries.push({ idx: i, hcp: Number(mHcp[1]), strokes: Number(mHcp[2]), netDiff: Number(mHcp[3]), line }); continue }
+    const mNoHcp = line.match(scoreReNoHcp)
+    if (mNoHcp) { scoreEntries.push({ idx: i, hcp: null, strokes: Number(mNoHcp[1]), netDiff: Number(mNoHcp[2]), line }); continue }
+    if (nameOnlyRe.test(line)) nameEntries.push({ idx: i, text: line, claimed: false })
+  }
+
+  const paired: { name: string; strokes: number; hcp: number | null; netDiff: number | null }[] = []
+  for (const score of scoreEntries) {
+    let name: string | null = null
+    let bestNameEntry: NameEntry | null = null
+    for (const n of nameEntries) {
+      if (n.claimed || n.idx >= score.idx) continue
+      if (!bestNameEntry || n.idx > bestNameEntry.idx) bestNameEntry = n
+    }
+    if (bestNameEntry) { name = bestNameEntry.text; bestNameEntry.claimed = true }
+    else {
+      name = score.line.replace(/^\d+[.\)\s]\s*/, '').replace(/HCP\s*\d+/gi, '').replace(/\d{1,3}\s+[+\-]?\d+.*$/, '').replace(/\s+/g, ' ').trim()
+      if (!name || name.length < 2 || /\d/.test(name)) name = null
+    }
+    let hcp = score.hcp
+    if (hcp == null) {
+      let bestHcp: HcpEntry | null = null
+      for (const h of hcpEntries) {
+        if (h.claimed || Math.abs(h.idx - score.idx) > 2) continue
+        if (!bestHcp || Math.abs(h.idx - score.idx) < Math.abs(bestHcp.idx - score.idx)) bestHcp = h
+      }
+      if (bestHcp) { hcp = bestHcp.val; bestHcp.claimed = true }
+    }
+    if (name) paired.push({ name, strokes: score.strokes, hcp, netDiff: score.netDiff })
+  }
+
+  const parVotes: Record<number, number> = {}
+  for (const r of paired) {
+    if (r.strokes >= 55 && r.strokes <= 160 && r.netDiff != null) {
+      const p = r.strokes - r.netDiff
+      parVotes[p] = (parVotes[p] ?? 0) + 1
+    }
+  }
+  const inferredPar = Object.keys(parVotes).length > 0
+    ? Number(Object.entries(parVotes).sort(([, a], [, b]) => b - a)[0][0])
+    : null
+
+  return paired.map(r => {
+    let strokes = r.strokes
+    if ((strokes < 55 || strokes > 160) && r.netDiff != null && inferredPar != null) {
+      const recovered = inferredPar + r.netDiff
+      if (recovered >= 55 && recovered <= 160) strokes = recovered
+    }
+    const netDiff = inferredPar != null ? strokes - inferredPar : r.netDiff
+    return { ...r, strokes, netDiff }
+  }).filter(r => r.strokes >= 55 && r.strokes <= 160)
+}
+
+function matchOcrName(scorecardName: string, playerNames: string[], nicknames: Record<string, string[]>): string | null {
+  const scWords = scorecardName.toLowerCase().split(/\s+/)
+  for (const pName of playerNames) {
+    const pWords = pName.toLowerCase().split(/\s+/)
+    for (const sc of scWords) {
+      for (const pw of pWords) {
+        if (sc === pw) return pName
+        if ((nicknames[pw] ?? []).includes(sc)) return pName
+        if ((nicknames[sc] ?? []).includes(pw)) return pName
+      }
+    }
+  }
+  return null
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const today = new Date().toISOString().slice(0, 10)
 const currentYear = new Date().getFullYear()
@@ -47,7 +148,10 @@ export default function ManageDataPage() {
   const [editRoundPlayers, setEditRoundPlayers] = useState<Player[]>([])
   const [editRoundScores, setEditRoundScores]   = useState<Record<string, string>>({})
   const [editNetDiff, setEditNetDiff]           = useState<Record<string, string>>({})
+  const [editGrossScores, setEditGrossScores]   = useState<Record<string, string>>({})
   const [editScoreSaving, setEditScoreSaving]   = useState(false)
+  const [editScanning, setEditScanning]         = useState(false)
+  const editFileRef = useRef<HTMLInputElement>(null)
 
   // Historical round form
   const [showHist, setShowHist]     = useState(false)
@@ -55,7 +159,10 @@ export default function ManageDataPage() {
   const [histVenue, setHistVenue]   = useState('')
   const [histScores, setHistScores] = useState<Record<string, string>>({})
   const [histNetDiff, setHistNetDiff] = useState<Record<string, string>>({})
+  const [histGrossScores, setHistGrossScores] = useState<Record<string, string>>({})
   const [histSaving, setHistSaving] = useState(false)
+  const [histScanning, setHistScanning] = useState(false)
+  const histFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (isAdmin) loadAll()
@@ -100,6 +207,8 @@ export default function ManageDataPage() {
     setEditVenue(r.notes ?? '')
     setEditRoundPlayers([])
     setEditRoundScores({})
+    setEditNetDiff({})
+    setEditGrossScores({})
 
     const [{ data: rpData }, { data: scoreData }] = await Promise.all([
       db.from('round_players').select('player_id, players(*)').eq('round_id', r.id),
@@ -110,12 +219,15 @@ export default function ManageDataPage() {
 
     const sc: Record<string, string> = {}
     const nd: Record<string, string> = {}
+    const gs: Record<string, string> = {}
     for (const s of (scoreData as Score[]) ?? []) {
       if (s.strokes != null) sc[s.player_id] = String(s.strokes)
       if (s.net_diff != null) nd[s.player_id] = String(s.net_diff)
+      if (s.gross_strokes != null) gs[s.player_id] = String(s.gross_strokes)
     }
     setEditRoundScores(sc)
     setEditNetDiff(nd)
+    setEditGrossScores(gs)
   }
 
   async function saveEditScores() {
@@ -134,16 +246,20 @@ export default function ManageDataPage() {
     if (entries.length < 2) { toast.error('Enter at least 2 net scores'); return }
 
     setEditScoreSaving(true)
-    const results = assignPoints(entries.map(({ playerId, strokes }) => ({ playerId, strokes })))
+    const withGross = entries.map(({ playerId, strokes }) => {
+      const gs = editGrossScores[playerId]?.trim()
+      const grossStrokes = gs != null && gs !== '' ? parseInt(gs) : undefined
+      return { playerId, strokes, grossStrokes }
+    })
+    const results = assignPoints(withGross)
     const upserts = results.map(r => {
-      const player = editRoundPlayers.find(p => p.id === r.playerId)
-      const hcp = player?.hcp ?? null
       const nd = editNetDiff[r.playerId]?.trim()
+      const gs = editGrossScores[r.playerId]?.trim()
       return {
         round_id:      editId,
         player_id:     r.playerId,
         strokes:       r.strokes,
-        gross_strokes: hcp != null ? r.strokes + hcp : null,
+        gross_strokes: gs != null && gs !== '' ? parseInt(gs) : null,
         net_diff:      nd !== '' && nd != null ? parseInt(nd) : null,
         points_earned: r.points,
         rank:          r.rank,
@@ -238,7 +354,12 @@ export default function ManageDataPage() {
       return
     }
 
-    const results = assignPoints(scoreInputs)
+    const withGross = scoreInputs.map(({ playerId, strokes }) => {
+      const gs = histGrossScores[playerId]?.trim()
+      const grossStrokes = gs != null && gs !== '' ? parseInt(gs) : undefined
+      return { playerId, strokes, grossStrokes }
+    })
+    const results = assignPoints(withGross)
 
     await db.from('round_players').insert(
       results.map(r => ({ round_id: newRound.id, player_id: r.playerId }))
@@ -246,14 +367,13 @@ export default function ManageDataPage() {
 
     const { error: scoreErr } = await db.from('scores').insert(
       results.map(r => {
-        const player = players.find(p => p.id === r.playerId)
-        const hcp = player?.hcp ?? null
         const nd = histNetDiff[r.playerId]?.trim()
+        const gs = histGrossScores[r.playerId]?.trim()
         return {
           round_id:      newRound.id,
           player_id:     r.playerId,
           strokes:       r.strokes,
-          gross_strokes: hcp != null ? r.strokes + hcp : null,
+          gross_strokes: gs != null && gs !== '' ? parseInt(gs) : null,
           net_diff:      nd !== '' && nd != null ? parseInt(nd) : null,
           points_earned: r.points,
           rank:          r.rank,
@@ -270,9 +390,86 @@ export default function ManageDataPage() {
       setHistVenue('')
       setHistScores({})
       setHistNetDiff({})
+      setHistGrossScores({})
       await loadAll()
     }
     setHistSaving(false)
+  }
+
+  // ── OCR scan ─────────────────────────────────────────────────────────────
+
+  function buildNicknames(): Record<string, string[]> {
+    const map: Record<string, string[]> = { ...BASE_NICKNAMES }
+    for (const p of players) {
+      const aliases = p.nicknames ?? []
+      const realWords = p.name.toLowerCase().split(/\s+/)
+      for (const alias of aliases) {
+        const key = alias.toLowerCase()
+        map[key] = [...(map[key] ?? []), ...realWords]
+      }
+    }
+    return map
+  }
+
+  async function runOcr(
+    file: File,
+    playerList: Player[],
+    setNet: (fn: (p: Record<string, string>) => Record<string, string>) => void,
+    setNd: (fn: (p: Record<string, string>) => Record<string, string>) => void,
+    setGs: (fn: (p: Record<string, string>) => Record<string, string>) => void,
+    setScanning: (v: boolean) => void,
+  ) {
+    setScanning(true)
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      const { createWorker } = await import('tesseract.js')
+      const worker = await createWorker('eng')
+      const { data: { text } } = await worker.recognize(dataUrl)
+      await worker.terminate()
+
+      const extracted = parseGolfGameBook(text)
+      const nicknames = buildNicknames()
+      const pNames = playerList.map(p => p.name)
+
+      const net: Record<string, string> = {}
+      const nd: Record<string, string>  = {}
+      const gs: Record<string, string>  = {}
+      const unmatched: string[] = []
+      let count = 0
+
+      for (const { name, strokes, hcp, netDiff } of extracted) {
+        const pName = matchOcrName(name, pNames, nicknames)
+        if (!pName) { unmatched.push(`${name}(${strokes})`); continue }
+        const player = playerList.find(p => p.name === pName)
+        if (player && !net[player.id]) {
+          net[player.id] = String(strokes)
+          if (netDiff != null) nd[player.id] = String(netDiff)
+          if (hcp != null) gs[player.id] = String(strokes + hcp)
+          count++
+        }
+      }
+
+      if (count === 0) {
+        const summary = extracted.map(e => `${e.name}=${e.strokes}`).join(' | ')
+        toast.error(extracted.length ? `No names matched. Parsed: ${summary}` : `Nothing parsed from image`, { duration: 12000 })
+      } else {
+        setNet(prev => ({ ...prev, ...net }))
+        setNd(prev => ({ ...prev, ...nd }))
+        setGs(prev => ({ ...prev, ...gs }))
+        const summary = extracted.map(e => `${e.name}=${e.strokes}`).join(' | ')
+        const detail = unmatched.length ? ` | Unmatched: ${unmatched.join(', ')}` : ''
+        toast.success(`Filled ${count}/${playerList.length} | ${summary}${detail}`, { duration: 12000 })
+      }
+    } catch (err) {
+      toast.error('Scan failed: ' + (err instanceof Error ? err.message : String(err)))
+    }
+    setScanning(false)
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -392,38 +589,42 @@ export default function ManageDataPage() {
                       {editRoundPlayers.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                           <div style={{ height: 1, background: 'var(--bunker-sand-deep)' }} />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Scores</span>
+                            <button type="button" onClick={() => editFileRef.current?.click()} disabled={editScanning}
+                              style={{ height: 30, padding: '0 10px', borderRadius: 6, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: editScanning ? 'var(--ink-faint)' : 'var(--ink)', cursor: editScanning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase' }}>
+                              {editScanning ? <Loader2 size={12} strokeWidth={2} style={{ animation: 'spin 1s linear infinite' }} /> : <ScanLine size={12} strokeWidth={2} />}
+                              {editScanning ? 'Scanning…' : 'Scan Scorecard'}
+                            </button>
+                            <input ref={editFileRef} type="file" accept="image/*" style={{ display: 'none' }}
+                              onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) runOcr(f, editRoundPlayers, setEditRoundScores, setEditNetDiff, setEditGrossScores, setEditScanning) }} />
+                          </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
                           </div>
-                          {editRoundPlayers.map(p => {
-                            const net = parseInt(editRoundScores[p.id] ?? '')
-                            const gross = !isNaN(net) && p.hcp != null ? net + p.hcp : null
-                            return (
-                              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
-                                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
-                                <input
-                                  type="number" min={40} max={130}
-                                  value={editRoundScores[p.id] ?? ''}
-                                  onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))}
-                                  placeholder="—"
-                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
-                                />
-                                <input
-                                  type="number" min={-50} max={50}
-                                  value={editNetDiff[p.id] ?? ''}
-                                  onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))}
-                                  placeholder="—"
-                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
-                                />
-                                <div style={{ height: 38, borderRadius: 8, background: 'var(--bunker-sand)', border: '1.5px solid var(--bunker-sand-deep)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 8px', fontFamily: 'var(--font-mono)', fontSize: 14, color: gross != null ? 'var(--ink)' : 'var(--ink-faint)' }}>
-                                  {gross != null ? gross : '—'}
-                                </div>
-                              </div>
-                            )
-                          })}
+                          {editRoundPlayers.map(p => (
+                            <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
+                              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
+                              <input type="number" min={40} max={130}
+                                value={editRoundScores[p.id] ?? ''}
+                                onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                placeholder="—"
+                                style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                              <input type="number" min={-50} max={50}
+                                value={editNetDiff[p.id] ?? ''}
+                                onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                placeholder="—"
+                                style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                              <input type="number" min={40} max={200}
+                                value={editGrossScores[p.id] ?? ''}
+                                onChange={e => setEditGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                placeholder="—"
+                                style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                            </div>
+                          ))}
                           <button onClick={saveEditScores} disabled={editScoreSaving}
                             style={{ height: 38, borderRadius: 8, border: 0, background: editScoreSaving ? '#ccc' : 'var(--fairway-green)', color: '#fff', fontWeight: 700, fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase', cursor: editScoreSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                             <Check size={14} strokeWidth={2.5} /> {editScoreSaving ? 'Saving…' : 'Save & Recalculate Points'}
@@ -500,7 +701,16 @@ export default function ManageDataPage() {
 
                 {/* Net scores per player */}
                 <div>
-                  <label style={label()}>Scores (leave Net blank to exclude a player)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <label style={label({ marginBottom: 0 })}>Scores (leave Net blank to exclude a player)</label>
+                    <button type="button" onClick={() => histFileRef.current?.click()} disabled={histScanning}
+                      style={{ height: 30, padding: '0 10px', borderRadius: 6, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: histScanning ? 'var(--ink-faint)' : 'var(--ink)', cursor: histScanning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', flexShrink: 0 }}>
+                      {histScanning ? <Loader2 size={12} strokeWidth={2} style={{ animation: 'spin 1s linear infinite' }} /> : <ScanLine size={12} strokeWidth={2} />}
+                      {histScanning ? 'Scanning…' : 'Scan'}
+                    </button>
+                    <input ref={histFileRef} type="file" accept="image/*" style={{ display: 'none' }}
+                      onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) runOcr(f, players, setHistScores, setHistNetDiff, setHistGrossScores, setHistScanning) }} />
+                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8 }}>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
@@ -508,32 +718,26 @@ export default function ManageDataPage() {
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
                     </div>
-                    {players.map(p => {
-                      const net = parseInt(histScores[p.id] ?? '')
-                      const gross = !isNaN(net) && p.hcp != null ? net + p.hcp : null
-                      return (
-                        <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
-                          <input
-                            type="number" min={40} max={130}
-                            value={histScores[p.id] ?? ''}
-                            onChange={e => setHistScores(prev => ({ ...prev, [p.id]: e.target.value }))}
-                            placeholder="—"
-                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
-                          />
-                          <input
-                            type="number" min={-50} max={50}
-                            value={histNetDiff[p.id] ?? ''}
-                            onChange={e => setHistNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))}
-                            placeholder="—"
-                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
-                          />
-                          <div style={{ height: 40, borderRadius: 8, background: 'var(--bunker-sand)', border: '1.5px solid var(--bunker-sand-deep)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 8px', fontFamily: 'var(--font-mono)', fontSize: 14, color: gross != null ? 'var(--ink)' : 'var(--ink-faint)' }}>
-                            {gross != null ? gross : '—'}
-                          </div>
-                        </div>
-                      )
-                    })}
+                    {players.map(p => (
+                      <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
+                        <input type="number" min={40} max={130}
+                          value={histScores[p.id] ?? ''}
+                          onChange={e => setHistScores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          placeholder="—"
+                          style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                        <input type="number" min={-50} max={50}
+                          value={histNetDiff[p.id] ?? ''}
+                          onChange={e => setHistNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          placeholder="—"
+                          style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                        <input type="number" min={40} max={200}
+                          value={histGrossScores[p.id] ?? ''}
+                          onChange={e => setHistGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          placeholder="—"
+                          style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -582,26 +786,28 @@ export default function ManageDataPage() {
                             {editRoundPlayers.length > 0 && (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                 <div style={{ height: 1, background: 'var(--bunker-sand-deep)' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Scores</span>
+                                  <button type="button" onClick={() => editFileRef.current?.click()} disabled={editScanning}
+                                    style={{ height: 28, padding: '0 8px', borderRadius: 6, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: editScanning ? 'var(--ink-faint)' : 'var(--ink)', cursor: editScanning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase' }}>
+                                    {editScanning ? <Loader2 size={11} strokeWidth={2} style={{ animation: 'spin 1s linear infinite' }} /> : <ScanLine size={11} strokeWidth={2} />}
+                                    {editScanning ? 'Scanning…' : 'Scan'}
+                                  </button>
+                                </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
                                 </div>
-                                {editRoundPlayers.map(p => {
-                                  const net = parseInt(editRoundScores[p.id] ?? '')
-                                  const gross = !isNaN(net) && p.hcp != null ? net + p.hcp : null
-                                  return (
-                                    <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
-                                      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
-                                      <input type="number" min={40} max={130} value={editRoundScores[p.id] ?? ''} onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
-                                      <input type="number" min={-50} max={50} value={editNetDiff[p.id] ?? ''} onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
-                                      <div style={{ height: 38, borderRadius: 8, background: 'var(--bunker-sand)', border: '1.5px solid var(--bunker-sand-deep)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 8px', fontFamily: 'var(--font-mono)', fontSize: 14, color: gross != null ? 'var(--ink)' : 'var(--ink-faint)' }}>
-                                        {gross != null ? gross : '—'}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
+                                {editRoundPlayers.map(p => (
+                                  <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
+                                    <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
+                                    <input type="number" min={40} max={130} value={editRoundScores[p.id] ?? ''} onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                                    <input type="number" min={-50} max={50} value={editNetDiff[p.id] ?? ''} onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                                    <input type="number" min={40} max={200} value={editGrossScores[p.id] ?? ''} onChange={e => setEditGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                                  </div>
+                                ))}
                                 <button onClick={saveEditScores} disabled={editScoreSaving} style={{ height: 38, borderRadius: 8, border: 0, background: editScoreSaving ? '#ccc' : 'var(--fairway-green)', color: '#fff', fontWeight: 700, fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase', cursor: editScoreSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                                   <Check size={14} strokeWidth={2.5} /> {editScoreSaving ? 'Saving…' : 'Save & Recalculate Points'}
                                 </button>
