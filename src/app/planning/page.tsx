@@ -7,6 +7,7 @@ import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, CalendarRange } from 'lucide-react'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -33,7 +34,8 @@ export default function PlanningPage() {
   const [saving, setSaving] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [unsavedPrompt, setUnsavedPrompt] = useState<(() => void) | null>(null)
-  const [profileNames, setProfileNames] = useState<Record<string, string>>({})
+  const [profileNames, setProfileNames]   = useState<Record<string, string>>({})
+  const [profileAvatars, setProfileAvatars] = useState<Record<string, string | null>>({})
   const [roundDates, setRoundDates]     = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
@@ -43,13 +45,18 @@ export default function PlanningPage() {
         .select('date, user_id, user_email')
         .gte('date', `${year}-01-01`)
         .lte('date', `${year}-12-31`),
-      db.from('profiles').select('id, name'),
+      db.from('profiles').select('id, name, avatar_url'),
       db.from('rounds').select('date').gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
     ])
     setRoundDates(new Set((rounds ?? []).map((r: { date: string }) => r.date)))
     const nameMap: Record<string, string> = {}
-    ;(profiles ?? []).forEach((p: { id: string; name: string }) => { nameMap[p.id] = p.name })
+    const avatarMap: Record<string, string | null> = {}
+    ;(profiles ?? []).forEach((p: { id: string; name: string; avatar_url: string | null }) => {
+      nameMap[p.id] = p.name
+      avatarMap[p.id] = p.avatar_url ?? null
+    })
     setProfileNames(nameMap)
+    setProfileAvatars(avatarMap)
     const blocks: Block[] = data ?? []
     setAllBlocks(blocks)
     const mine = new Set(
@@ -401,11 +408,16 @@ export default function PlanningPage() {
                   ) : (
                     allBlocks
                       .filter(b => b.date === selectedDate)
-                      .map(b => (
-                        <div key={b.user_email} style={{ fontSize: 13, color: 'var(--ink)', padding: '3px 0', fontWeight: 500 }}>
-                          {profileNames[b.user_id] ?? b.user_email}
-                        </div>
-                      ))
+                      .map(b => {
+                        const name = profileNames[b.user_id] || b.user_email
+                        const avatarUrl = profileAvatars[b.user_id] ?? null
+                        return (
+                          <div key={b.user_email} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                            <PlayerAvatar name={name} avatarUrl={avatarUrl} size={28} />
+                            <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>{name}</span>
+                          </div>
+                        )
+                      })
                   )}
                 </div>
               )}
