@@ -536,7 +536,7 @@ export default function HistoryPage() {
                         style={{
                           position: 'absolute', left: '50%', top: 0,
                           transform: 'translateX(-50%)',
-                          height: '100%', width: 'min(56%, 260px)',
+                          height: '100%', width: 'min(56%, 245px)',
                           objectFit: 'cover', objectPosition: 'center 30%',
                         }}
                       />
@@ -544,7 +544,7 @@ export default function HistoryPage() {
                       <div style={{
                         position: 'absolute', left: '50%', top: 0,
                         transform: 'translateX(-50%)',
-                        height: '100%', width: 'min(56%, 260px)',
+                        height: '100%', width: 'min(56%, 245px)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontFamily: 'var(--font-display)', fontSize: 120, fontWeight: 700,
                         color: 'rgba(255,255,255,.08)', lineHeight: 1, userSelect: 'none',
