@@ -93,13 +93,13 @@ export default function PlayersPage() {
     const path = `${uploadingFor}/avatar.${ext}`
 
     const { error: uploadError } = await supabase.storage
-      .from('player-avatars')
+      .from('players-avatars')
       .upload(path, file, { upsert: true })
 
     if (uploadError) { toast.error('Upload failed: ' + uploadError.message); setUploadingFor(null); return }
 
     const { data: { publicUrl } } = supabase.storage
-      .from('player-avatars')
+      .from('players-avatars')
       .getPublicUrl(path)
 
     const { error } = await db.from('players').update({ avatar_url: publicUrl }).eq('id', uploadingFor)

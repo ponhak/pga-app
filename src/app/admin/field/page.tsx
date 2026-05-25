@@ -157,9 +157,9 @@ export default function FieldPage() {
     if (!file || !uploadingFor) return
     const ext = file.name.split('.').pop() ?? 'jpg'
     const path = `${uploadingFor}/avatar.${ext}`
-    const { error: uploadError } = await supabase.storage.from('player-avatars').upload(path, file, { upsert: true })
+    const { error: uploadError } = await supabase.storage.from('players-avatars').upload(path, file, { upsert: true })
     if (uploadError) { toast.error('Upload failed: ' + uploadError.message); setUploadingFor(null); return }
-    const { data: { publicUrl } } = supabase.storage.from('player-avatars').getPublicUrl(path)
+    const { data: { publicUrl } } = supabase.storage.from('players-avatars').getPublicUrl(path)
     const { error } = await db.from('players').update({ avatar_url: publicUrl }).eq('id', uploadingFor)
     if (error) { toast.error('Failed to save photo') }
     else { toast.success('Photo updated!'); await loadAll() }
