@@ -218,7 +218,17 @@ export default function ManageDataPage() {
       db.from('scores').select('*').eq('round_id', r.id),
     ])
     const rp = (rpData as { player_id: string; players: Player }[]) ?? []
-    setEditRoundPlayers(rp.map(x => x.players).sort((a, b) => a.name.localeCompare(b.name)))
+    const rpIds = new Set(rp.map(x => x.player_id))
+    // Include players who have a score row but no round_players row (legacy DNS/DNF)
+    const orphanIds = ((scoreData as Score[]) ?? [])
+      .map(s => s.player_id)
+      .filter(id => !rpIds.has(id))
+    let allPlayers = rp.map(x => x.players)
+    if (orphanIds.length > 0) {
+      const { data: orphanPlayers } = await db.from('players').select('*').in('id', orphanIds)
+      allPlayers = [...allPlayers, ...((orphanPlayers as Player[]) ?? [])]
+    }
+    setEditRoundPlayers(allPlayers.sort((a, b) => a.name.localeCompare(b.name)))
 
     const sc: Record<string, string> = {}
     const nd: Record<string, string> = {}
@@ -307,6 +317,14 @@ export default function ManageDataPage() {
         dnf:           true,
       })),
     ]
+    const allPlayerIds = [
+      ...entries.map(e => e.playerId),
+      ...dnfPlayers.map(p => p.id),
+      ...dnsPlayers.map(p => p.id),
+    ]
+    const rpInserts = allPlayerIds.map(player_id => ({ round_id: editId, player_id }))
+    await db.from('round_players').upsert(rpInserts, { onConflict: 'round_id,player_id' })
+
     const { error } = await db.from('scores').upsert(upserts, { onConflict: 'round_id,player_id' })
     if (error) {
       toast.error(error.message)
