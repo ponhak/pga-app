@@ -56,11 +56,11 @@ export function Sidebar() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="PGA Schager" style={{ height: 72, width: 'auto', flexShrink: 0 }} />
           <span style={{
-            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 26,
-            textTransform: 'uppercase', letterSpacing: '.02em', lineHeight: 1.1,
-            color: '#fff',
+            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20,
+            textTransform: 'uppercase', letterSpacing: '.04em', lineHeight: 1,
+            color: '#fff', whiteSpace: 'nowrap',
           }}>
-            PGA<br />Schager
+            PGA Schager
           </span>
         </Link>
       </div>
