@@ -58,10 +58,10 @@ function PlayerStatsPanel({
   allRounds: Round[]
   allScores: Score[]
 }) {
-  const [careerScores, setCareerScores] = useState<{ rank: number | null; dnf: boolean }[] | null>(null)
+  const [careerScores, setCareerScores] = useState<{ rank: number | null; dnf: boolean; points_earned: number | null }[] | null>(null)
 
   useEffect(() => {
-    db.from('scores').select('rank, dnf').eq('player_id', player.id).then(({ data }: { data: { rank: number | null; dnf: boolean }[] | null }) => {
+    db.from('scores').select('rank, dnf, points_earned').eq('player_id', player.id).then(({ data }: { data: { rank: number | null; dnf: boolean; points_earned: number | null }[] | null }) => {
       setCareerScores(data ?? [])
     })
   }, [player.id])
@@ -239,7 +239,8 @@ function PlayerStatsPanel({
           {allRounds.map((r, i) => {
             const sc = allScores.find(s => s.round_id === r.id && s.player_id === player.id)
             const played = sc && sc.strokes != null
-            const isDnf  = sc?.dnf === true
+            const isDns  = sc?.dnf === true && (sc?.points_earned === 0 || sc?.points_earned == null)
+            const isDnf  = sc?.dnf === true && !isDns
             const d = new Date(r.date + 'T12:00:00')
             const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
             const diffColor = sc?.net_diff == null ? 'rgba(255,255,255,.30)'
@@ -249,7 +250,7 @@ function PlayerStatsPanel({
                 display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 44px',
                 alignItems: 'center', padding: '7px 0',
                 borderBottom: i < allRounds.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none',
-                opacity: played || isDnf ? 1 : 0.38,
+                opacity: played || isDnf || isDns ? 1 : 0.38,
               }}>
                 <div>
                   <span style={{ fontSize: 12, color: '#F5EFE0', fontWeight: 500 }}>{dateStr}</span>
@@ -257,8 +258,8 @@ function PlayerStatsPanel({
                   {r.notes && <div style={{ fontSize: 10, color: 'rgba(255,255,255,.40)', marginTop: 1 }}>{r.notes}</div>}
                 </div>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, textAlign: 'center',
-                  color: isDnf ? 'var(--tournament-red)' : played ? '#F5EFE0' : 'rgba(255,255,255,.30)' }}>
-                  {isDnf ? 'DNF' : played ? ordinal(sc!.rank!) : '—'}
+                  color: isDnf ? 'var(--tournament-red)' : isDns ? 'rgba(255,255,255,.40)' : played ? '#F5EFE0' : 'rgba(255,255,255,.30)' }}>
+                  {isDns ? 'DNS' : isDnf ? 'DNF' : played ? ordinal(sc!.rank!) : '—'}
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, textAlign: 'center', color: played ? '#F5EFE0' : 'rgba(255,255,255,.30)' }}>
                   {played ? sc!.strokes : '—'}

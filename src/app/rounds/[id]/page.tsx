@@ -946,25 +946,29 @@ export default function RoundPage() {
               {sortedScores.map((s, i) => {
                 const player = players.find(p => p.id === s.player_id)
                 const isFirst = s.rank === 1
-                const isDnf = s.dnf === true
+                const isDns = s.dnf === true && (s.points_earned === 0 || s.points_earned == null)
+                const isDnf = s.dnf === true && !isDns
+                const noScore = isDnf || isDns
                 const gross = s.gross_strokes
                 const netDiff = s.net_diff
                 const diffColor = netDiff == null ? 'var(--ink-faint)' : netDiff < 0 ? 'var(--fairway-green)' : netDiff > 0 ? 'var(--tournament-red)' : 'var(--ink-soft)'
+                const posLabel = isDnf ? 'DNF' : isDns ? 'DNS' : String(s.rank)
+                const posColor = isFirst ? 'var(--trophy-gold)' : isDnf ? 'var(--tournament-red)' : isDns ? 'var(--ink-soft)' : 'var(--ink-soft)'
                 return (
-                  <div key={s.id} className="grid grid-cols-[30px_1fr_52px_48px_52px_54px] md:grid-cols-[36px_1fr_80px_72px_80px_80px]" style={{ alignItems: 'center', padding: '10px 14px', background: isFirst ? 'rgba(201,162,74,.08)' : isDnf ? 'rgba(200,16,46,.04)' : 'transparent', borderBottom: i < sortedScores.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', opacity: isDnf ? 0.7 : 1 }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: isDnf ? 9 : 13, fontWeight: 700, color: isFirst ? 'var(--trophy-gold)' : isDnf ? 'var(--tournament-red)' : 'var(--ink-soft)', letterSpacing: isDnf ? '.04em' : 0 }}>
-                      {isDnf ? 'DNF' : s.rank}
+                  <div key={s.id} className="grid grid-cols-[30px_1fr_52px_48px_52px_54px] md:grid-cols-[36px_1fr_80px_72px_80px_80px]" style={{ alignItems: 'center', padding: '10px 14px', background: isFirst ? 'rgba(201,162,74,.08)' : isDnf ? 'rgba(200,16,46,.04)' : 'transparent', borderBottom: i < sortedScores.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', opacity: noScore ? 0.7 : 1 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: noScore ? 9 : 13, fontWeight: 700, color: posColor, letterSpacing: noScore ? '.04em' : 0 }}>
+                      {posLabel}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                       <PlayerAvatar name={player?.name ?? '?'} avatarUrl={player?.avatar_url} size={26} />
-                      <span style={{ fontSize: 14, fontWeight: 500, color: isDnf ? 'var(--ink-soft)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player?.name ?? '?'}</span>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: noScore ? 'var(--ink-soft)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player?.name ?? '?'}</span>
                     </div>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--ink-faint)', textAlign: 'center' }}>{isDnf ? '—' : (gross ?? '—')}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: isDnf ? 'var(--ink-faint)' : 'var(--ink)', textAlign: 'center' }}>{isDnf ? '—' : (s.strokes ?? '—')}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, textAlign: 'center', color: isDnf ? 'var(--ink-faint)' : diffColor }}>
-                      {isDnf ? '—' : (netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—')}
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--ink-faint)', textAlign: 'center' }}>{noScore ? '—' : (gross ?? '—')}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: noScore ? 'var(--ink-faint)' : 'var(--ink)', textAlign: 'center' }}>{noScore ? '—' : (s.strokes ?? '—')}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, textAlign: 'center', color: noScore ? 'var(--ink-faint)' : diffColor }}>
+                      {noScore ? '—' : (netDiff != null ? (netDiff > 0 ? `+${netDiff}` : String(netDiff)) : '—')}
                     </span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, textAlign: 'center', color: isFirst ? 'var(--trophy-gold)' : isDnf ? 'var(--ink-soft)' : 'var(--ink)' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, textAlign: 'center', color: isFirst ? 'var(--trophy-gold)' : noScore ? 'var(--ink-soft)' : 'var(--ink)' }}>
                       {s.points_earned != null ? (Number(s.points_earned) % 1 === 0 ? String(s.points_earned) : Number(s.points_earned).toFixed(1)) : '—'}
                     </span>
                   </div>
