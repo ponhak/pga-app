@@ -149,6 +149,7 @@ export default function ManageDataPage() {
   const [editRoundScores, setEditRoundScores]   = useState<Record<string, string>>({})
   const [editNetDiff, setEditNetDiff]           = useState<Record<string, string>>({})
   const [editGrossScores, setEditGrossScores]   = useState<Record<string, string>>({})
+  const [editStatus, setEditStatus]             = useState<Record<string, 'dnf' | 'dns'>>({})
   const [editScoreSaving, setEditScoreSaving]   = useState(false)
   const [editScanning, setEditScanning]         = useState(false)
   const editFileRef = useRef<HTMLInputElement>(null)
@@ -160,13 +161,10 @@ export default function ManageDataPage() {
   const [histScores, setHistScores] = useState<Record<string, string>>({})
   const [histNetDiff, setHistNetDiff] = useState<Record<string, string>>({})
   const [histGrossScores, setHistGrossScores] = useState<Record<string, string>>({})
-  const [histDns, setHistDns]           = useState<Set<string>>(new Set())
+  const [histStatus, setHistStatus] = useState<Record<string, 'dnf' | 'dns'>>({})
   const [histSaving, setHistSaving] = useState(false)
   const [histScanning, setHistScanning] = useState(false)
   const histFileRef = useRef<HTMLInputElement>(null)
-
-  // DNS state for inline edit (both current and historical)
-  const [editDns, setEditDns] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (isAdmin) loadAll()
@@ -213,7 +211,7 @@ export default function ManageDataPage() {
     setEditRoundScores({})
     setEditNetDiff({})
     setEditGrossScores({})
-    setEditDns(new Set())
+    setEditStatus({})
 
     const [{ data: rpData }, { data: scoreData }] = await Promise.all([
       db.from('round_players').select('player_id, players(*)').eq('round_id', r.id),
@@ -225,9 +223,12 @@ export default function ManageDataPage() {
     const sc: Record<string, string> = {}
     const nd: Record<string, string> = {}
     const gs: Record<string, string> = {}
-    const dns = new Set<string>()
+    const st: Record<string, 'dnf' | 'dns'> = {}
     for (const s of (scoreData as Score[]) ?? []) {
-      if (s.dnf && (s.points_earned === 0 || s.points_earned == null)) { dns.add(s.player_id); continue }
+      if (s.dnf) {
+        st[s.player_id] = (s.points_earned === 0 || s.points_earned == null) ? 'dns' : 'dnf'
+        continue
+      }
       if (s.strokes != null) sc[s.player_id] = String(s.strokes)
       if (s.net_diff != null) nd[s.player_id] = String(s.net_diff)
       if (s.gross_strokes != null) gs[s.player_id] = String(s.gross_strokes)
@@ -235,7 +236,7 @@ export default function ManageDataPage() {
     setEditRoundScores(sc)
     setEditNetDiff(nd)
     setEditGrossScores(gs)
-    setEditDns(dns)
+    setEditStatus(st)
   }
 
   async function saveEditScores() {
@@ -254,8 +255,10 @@ export default function ManageDataPage() {
     if (entries.length < 2) { toast.error('Enter at least 2 net scores'); return }
 
     setEditScoreSaving(true)
-    const dnsPlayers = editRoundPlayers.filter(p => editDns.has(p.id))
-    const totalField = entries.length + dnsPlayers.length
+    const dnfPlayers = editRoundPlayers.filter(p => editStatus[p.id] === 'dnf')
+    const dnsPlayers = editRoundPlayers.filter(p => editStatus[p.id] === 'dns')
+    // DNS excluded from field; DNF counted in field
+    const totalField = entries.length + dnfPlayers.length
 
     const withGross = entries.map(({ playerId, strokes }) => {
       const gs = editGrossScores[playerId]?.trim()
@@ -280,6 +283,19 @@ export default function ManageDataPage() {
           dnf:           false,
         }
       }),
+      ...dnfPlayers.map((p, i) => {
+        const rank = maxRank + i + 1
+        return {
+          round_id:      editId,
+          player_id:     p.id,
+          strokes:       null,
+          gross_strokes: null,
+          net_diff:      null,
+          points_earned: Math.max(0, totalField - rank + 1),
+          rank,
+          dnf:           true,
+        }
+      }),
       ...dnsPlayers.map((p, i) => ({
         round_id:      editId,
         player_id:     p.id,
@@ -287,7 +303,7 @@ export default function ManageDataPage() {
         gross_strokes: null,
         net_diff:      null,
         points_earned: 0,
-        rank:          maxRank + i + 1,
+        rank:          maxRank + dnfPlayers.length + i + 1,
         dnf:           true,
       })),
     ]
@@ -360,7 +376,8 @@ export default function ManageDataPage() {
     }
 
     const scoreInputs = scoreInputsRaw.map(({ playerId, strokes }) => ({ playerId, strokes }))
-    const dnsPlayers = players.filter(p => histDns.has(p.id))
+    const dnfPlayers = players.filter(p => histStatus[p.id] === 'dnf')
+    const dnsPlayers = players.filter(p => histStatus[p.id] === 'dns')
 
     if (scoreInputs.length < 2) {
       toast.error('Enter net scores for at least 2 players')
@@ -381,7 +398,8 @@ export default function ManageDataPage() {
       return
     }
 
-    const totalField = scoreInputs.length + dnsPlayers.length
+    // DNS excluded from field; DNF counted in field
+    const totalField = scoreInputs.length + dnfPlayers.length
     const withGross = scoreInputs.map(({ playerId, strokes }) => {
       const gs = histGrossScores[playerId]?.trim()
       const grossStrokes = gs != null && gs !== '' ? parseInt(gs) : undefined
@@ -392,6 +410,7 @@ export default function ManageDataPage() {
 
     const allParticipants = [
       ...results.map(r => r.playerId),
+      ...dnfPlayers.map(p => p.id),
       ...dnsPlayers.map(p => p.id),
     ]
     await db.from('round_players').insert(
@@ -413,6 +432,19 @@ export default function ManageDataPage() {
           dnf:           false,
         }
       }),
+      ...dnfPlayers.map((p, i) => {
+        const rank = maxRank + i + 1
+        return {
+          round_id:      newRound.id,
+          player_id:     p.id,
+          strokes:       null,
+          gross_strokes: null,
+          net_diff:      null,
+          points_earned: Math.max(0, totalField - rank + 1),
+          rank,
+          dnf:           true,
+        }
+      }),
       ...dnsPlayers.map((p, i) => ({
         round_id:      newRound.id,
         player_id:     p.id,
@@ -420,7 +452,7 @@ export default function ManageDataPage() {
         gross_strokes: null,
         net_diff:      null,
         points_earned: 0,
-        rank:          maxRank + i + 1,
+        rank:          maxRank + dnfPlayers.length + i + 1,
         dnf:           true,
       })),
     ])
@@ -435,7 +467,7 @@ export default function ManageDataPage() {
       setHistScores({})
       setHistNetDiff({})
       setHistGrossScores({})
-      setHistDns(new Set())
+      setHistStatus({})
       await loadAll()
     }
     setHistSaving(false)
@@ -644,36 +676,42 @@ export default function ManageDataPage() {
                             <input ref={editFileRef} type="file" accept="image/*" style={{ display: 'none' }}
                               onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) runOcr(f, editRoundPlayers, setEditRoundScores, setEditNetDiff, setEditGrossScores, setEditScanning) }} />
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 44px', gap: 8, alignItems: 'center' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>DNS</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Status</span>
                           </div>
                           {editRoundPlayers.map(p => {
-                            const isDns = editDns.has(p.id)
+                            const st = editStatus[p.id]
+                            const disabled = !!st
+                            const next = st === undefined ? 'dnf' : st === 'dnf' ? 'dns' : undefined
+                            const btnColor = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? '#B07800' : 'var(--ink-faint)'
+                            const btnBg    = st === 'dns' ? 'rgba(200,16,46,.08)' : st === 'dnf' ? 'rgba(201,162,74,.12)' : 'transparent'
+                            const btnBorder = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? 'var(--trophy-gold)' : 'var(--bunker-sand-deep)'
                             return (
-                              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 44px', gap: 8, alignItems: 'center' }}>
-                                <span style={{ fontSize: 14, fontWeight: 500, color: isDns ? 'var(--ink-faint)' : 'var(--ink)' }}>{p.name}</span>
-                                <input type="number" min={40} max={130} disabled={isDns}
-                                  value={isDns ? '' : (editRoundScores[p.id] ?? '')}
+                              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
+                                <span style={{ fontSize: 14, fontWeight: 500, color: disabled ? 'var(--ink-faint)' : 'var(--ink)' }}>{p.name}</span>
+                                <input type="number" min={40} max={130} disabled={disabled}
+                                  value={disabled ? '' : (editRoundScores[p.id] ?? '')}
                                   onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))}
                                   placeholder="—"
-                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: isDns ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: isDns ? 0.4 : 1 }} />
-                                <input type="number" min={-50} max={50} disabled={isDns}
-                                  value={isDns ? '' : (editNetDiff[p.id] ?? '')}
+                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
+                                <input type="number" min={-50} max={50} disabled={disabled}
+                                  value={disabled ? '' : (editNetDiff[p.id] ?? '')}
                                   onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))}
                                   placeholder="—"
-                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: isDns ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: isDns ? 0.4 : 1 }} />
-                                <input type="number" min={40} max={200} disabled={isDns}
-                                  value={isDns ? '' : (editGrossScores[p.id] ?? '')}
+                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
+                                <input type="number" min={40} max={200} disabled={disabled}
+                                  value={disabled ? '' : (editGrossScores[p.id] ?? '')}
                                   onChange={e => setEditGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))}
                                   placeholder="—"
-                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: isDns ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: isDns ? 0.4 : 1 }} />
-                                <button type="button" onClick={() => setEditDns(prev => { const s = new Set(prev); isDns ? s.delete(p.id) : s.add(p.id); return s })}
-                                  style={{ width: 44, height: 38, borderRadius: 8, border: `1.5px solid ${isDns ? 'var(--tournament-red)' : 'var(--bunker-sand-deep)'}`, background: isDns ? 'rgba(200,16,46,.08)' : 'transparent', color: isDns ? 'var(--tournament-red)' : 'var(--ink-faint)', cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  DNS
+                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
+                                <button type="button"
+                                  onClick={() => setEditStatus(prev => { const n = { ...prev }; next === undefined ? delete n[p.id] : (n[p.id] = next); return n })}
+                                  style={{ width: 48, height: 38, borderRadius: 8, border: `1.5px solid ${btnBorder}`, background: btnBg, color: btnColor, cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  {st ? st.toUpperCase() : '—'}
                                 </button>
                               </div>
                             )
@@ -765,36 +803,42 @@ export default function ManageDataPage() {
                       onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) runOcr(f, players, setHistScores, setHistNetDiff, setHistGrossScores, setHistScanning) }} />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 44px', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8 }}>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>DNS</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Status</span>
                     </div>
                     {players.map(p => {
-                      const isDns = histDns.has(p.id)
+                      const st = histStatus[p.id]
+                      const disabled = !!st
+                      const next = st === undefined ? 'dnf' : st === 'dnf' ? 'dns' : undefined
+                      const btnColor = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? '#B07800' : 'var(--ink-faint)'
+                      const btnBg    = st === 'dns' ? 'rgba(200,16,46,.08)' : st === 'dnf' ? 'rgba(201,162,74,.12)' : 'transparent'
+                      const btnBorder = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? 'var(--trophy-gold)' : 'var(--bunker-sand-deep)'
                       return (
-                        <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 44px', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontSize: 14, fontWeight: 500, color: isDns ? 'var(--ink-faint)' : 'var(--ink)' }}>{p.name}</span>
-                          <input type="number" min={40} max={130} disabled={isDns}
-                            value={isDns ? '' : (histScores[p.id] ?? '')}
+                        <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: 14, fontWeight: 500, color: disabled ? 'var(--ink-faint)' : 'var(--ink)' }}>{p.name}</span>
+                          <input type="number" min={40} max={130} disabled={disabled}
+                            value={disabled ? '' : (histScores[p.id] ?? '')}
                             onChange={e => setHistScores(prev => ({ ...prev, [p.id]: e.target.value }))}
                             placeholder="—"
-                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: isDns ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: isDns ? 0.4 : 1 }} />
-                          <input type="number" min={-50} max={50} disabled={isDns}
-                            value={isDns ? '' : (histNetDiff[p.id] ?? '')}
+                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
+                          <input type="number" min={-50} max={50} disabled={disabled}
+                            value={disabled ? '' : (histNetDiff[p.id] ?? '')}
                             onChange={e => setHistNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))}
                             placeholder="—"
-                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: isDns ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: isDns ? 0.4 : 1 }} />
-                          <input type="number" min={40} max={200} disabled={isDns}
-                            value={isDns ? '' : (histGrossScores[p.id] ?? '')}
+                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
+                          <input type="number" min={40} max={200} disabled={disabled}
+                            value={disabled ? '' : (histGrossScores[p.id] ?? '')}
                             onChange={e => setHistGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))}
                             placeholder="—"
-                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: isDns ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: isDns ? 0.4 : 1 }} />
-                          <button type="button" onClick={() => setHistDns(prev => { const s = new Set(prev); isDns ? s.delete(p.id) : s.add(p.id); return s })}
-                            style={{ width: 44, height: 40, borderRadius: 8, border: `1.5px solid ${isDns ? 'var(--tournament-red)' : 'var(--bunker-sand-deep)'}`, background: isDns ? 'rgba(200,16,46,.08)' : 'transparent', color: isDns ? 'var(--tournament-red)' : 'var(--ink-faint)', cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            DNS
+                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
+                          <button type="button"
+                            onClick={() => setHistStatus(prev => { const n = { ...prev }; next === undefined ? delete n[p.id] : (n[p.id] = next); return n })}
+                            style={{ width: 48, height: 40, borderRadius: 8, border: `1.5px solid ${btnBorder}`, background: btnBg, color: btnColor, cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {st ? st.toUpperCase() : '—'}
                           </button>
                         </div>
                       )
@@ -855,24 +899,30 @@ export default function ManageDataPage() {
                                     {editScanning ? 'Scanning…' : 'Scan'}
                                   </button>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 44px', gap: 8, alignItems: 'center' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
-                                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>DNS</span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Status</span>
                                 </div>
                                 {editRoundPlayers.map(p => {
-                                  const isDns = editDns.has(p.id)
+                                  const st = editStatus[p.id]
+                                  const disabled = !!st
+                                  const next = st === undefined ? 'dnf' : st === 'dnf' ? 'dns' : undefined
+                                  const btnColor = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? '#B07800' : 'var(--ink-faint)'
+                                  const btnBg    = st === 'dns' ? 'rgba(200,16,46,.08)' : st === 'dnf' ? 'rgba(201,162,74,.12)' : 'transparent'
+                                  const btnBorder = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? 'var(--trophy-gold)' : 'var(--bunker-sand-deep)'
                                   return (
-                                    <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 44px', gap: 8, alignItems: 'center' }}>
-                                      <span style={{ fontSize: 14, fontWeight: 500, color: isDns ? 'var(--ink-faint)' : 'var(--ink)' }}>{p.name}</span>
-                                      <input type="number" min={40} max={130} disabled={isDns} value={isDns ? '' : (editRoundScores[p.id] ?? '')} onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: isDns ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: isDns ? 0.4 : 1 }} />
-                                      <input type="number" min={-50} max={50} disabled={isDns} value={isDns ? '' : (editNetDiff[p.id] ?? '')} onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: isDns ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: isDns ? 0.4 : 1 }} />
-                                      <input type="number" min={40} max={200} disabled={isDns} value={isDns ? '' : (editGrossScores[p.id] ?? '')} onChange={e => setEditGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: isDns ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: isDns ? 0.4 : 1 }} />
-                                      <button type="button" onClick={() => setEditDns(prev => { const s = new Set(prev); isDns ? s.delete(p.id) : s.add(p.id); return s })}
-                                        style={{ width: 44, height: 38, borderRadius: 8, border: `1.5px solid ${isDns ? 'var(--tournament-red)' : 'var(--bunker-sand-deep)'}`, background: isDns ? 'rgba(200,16,46,.08)' : 'transparent', color: isDns ? 'var(--tournament-red)' : 'var(--ink-faint)', cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        DNS
+                                    <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
+                                      <span style={{ fontSize: 14, fontWeight: 500, color: disabled ? 'var(--ink-faint)' : 'var(--ink)' }}>{p.name}</span>
+                                      <input type="number" min={40} max={130} disabled={disabled} value={disabled ? '' : (editRoundScores[p.id] ?? '')} onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
+                                      <input type="number" min={-50} max={50} disabled={disabled} value={disabled ? '' : (editNetDiff[p.id] ?? '')} onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
+                                      <input type="number" min={40} max={200} disabled={disabled} value={disabled ? '' : (editGrossScores[p.id] ?? '')} onChange={e => setEditGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
+                                      <button type="button"
+                                        onClick={() => setEditStatus(prev => { const n = { ...prev }; next === undefined ? delete n[p.id] : (n[p.id] = next); return n })}
+                                        style={{ width: 48, height: 38, borderRadius: 8, border: `1.5px solid ${btnBorder}`, background: btnBg, color: btnColor, cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        {st ? st.toUpperCase() : '—'}
                                       </button>
                                     </div>
                                   )
