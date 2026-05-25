@@ -64,6 +64,7 @@ export default function FieldPage() {
 
   // name (lowercase) → { email, is_admin }
   const [memberByName, setMemberByName] = useState<Record<string, MemberInfo>>({})
+  const [unmatchedMembers, setUnmatchedMembers] = useState<MemberInfo[]>([])
   const [toggling, setToggling] = useState<string | null>(null)
 
   useEffect(() => {
@@ -88,29 +89,43 @@ export default function FieldPage() {
   }
 
   async function loadMemberMap() {
-    const [{ data: blocks }, { data: profiles }, { data: emailData }] = await Promise.all([
-      db.from('availability_blocks').select('user_id, user_email'),
+    const [{ data: profiles }, { data: emailData }, { data: blocks }] = await Promise.all([
       db.from('profiles').select('id, name'),
-      db.from('allowed_emails').select('email, is_admin'),
+      db.from('allowed_emails').select('email, is_admin, user_id'),
+      db.from('availability_blocks').select('user_id, user_email'),
     ])
 
-    // email → is_admin
+    const emailList = (emailData ?? []) as { email: string; is_admin: boolean; user_id?: string | null }[]
+
+    // Build user_id → MemberInfo
+    // Method 1: direct user_id column on allowed_emails (if it exists)
+    const infoByUserId: Record<string, MemberInfo> = {}
+    for (const e of emailList) {
+      if (e.user_id) infoByUserId[e.user_id] = { email: e.email, is_admin: e.is_admin }
+    }
+
+    // Method 2: bridge via availability_blocks (user_id ↔ user_email)
     const adminByEmail: Record<string, boolean> = {}
-    for (const e of (emailData ?? [])) adminByEmail[e.email] = e.is_admin
-
-    // user_id → email (from blocks, first occurrence)
-    const emailByUserId: Record<string, string> = {}
-    for (const b of (blocks ?? [])) if (!emailByUserId[b.user_id]) emailByUserId[b.user_id] = b.user_email
-
-    // name (lower) → { email, is_admin }
-    const map: Record<string, MemberInfo> = {}
-    for (const p of (profiles ?? [])) {
-      const email = emailByUserId[p.id]
-      if (email && p.name && adminByEmail[email] !== undefined) {
-        map[p.name.toLowerCase()] = { email, is_admin: adminByEmail[email] }
+    for (const e of emailList) adminByEmail[e.email] = e.is_admin
+    for (const b of (blocks ?? [])) {
+      if (!infoByUserId[b.user_id] && adminByEmail[b.user_email] !== undefined) {
+        infoByUserId[b.user_id] = { email: b.user_email, is_admin: adminByEmail[b.user_email] }
       }
     }
+
+    // Match profiles to player names
+    const map: Record<string, MemberInfo> = {}
+    const matchedEmails = new Set<string>()
+    for (const p of (profiles ?? [])) {
+      const info = infoByUserId[p.id]
+      if (info && p.name) {
+        map[p.name.toLowerCase()] = info
+        matchedEmails.add(info.email)
+      }
+    }
+
     setMemberByName(map)
+    setUnmatchedMembers(emailList.filter(e => !matchedEmails.has(e.email)))
   }
 
   async function addPlayer(e: React.FormEvent) {
@@ -191,7 +206,7 @@ export default function FieldPage() {
       .select('email', { count: 'exact', head: true })
     if (error) { toast.error(error.message) }
     else if (count === 0) { toast.error('Permission denied — check Supabase RLS policies') }
-    else { toast.success(`${email} is ${!current ? 'now an admin' : 'no longer an admin'}`); await loadMemberMap() }
+    else { toast.success(`${email} is ${!current ? 'now an admin' : 'no longer an admin'}`); await loadMemberMap(); }
     setToggling(null)
   }
 
@@ -372,6 +387,35 @@ export default function FieldPage() {
           </div>
         )}
       </div>
+
+      {/* Unmatched members — accounts with no linked player card */}
+      {unmatchedMembers.length > 0 && (
+        <div style={{ padding: '0 16px 40px', borderTop: '1px solid var(--bunker-sand-deep)', paddingTop: 20 }}>
+          <div className="eyebrow" style={{ marginBottom: 4 }}>Members without a player card</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 14 }}>
+            These accounts are not linked to any player in the field.
+          </div>
+          <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
+            {unmatchedMembers.map((m, i) => {
+              const isSuperAdmin = m.email === ADMIN_EMAIL
+              return (
+                <div key={m.email} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: i < unmatchedMembers.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', background: m.is_admin ? 'rgba(31,122,76,.04)' : 'transparent' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: m.is_admin ? 'var(--fairway-green)' : 'var(--bunker-sand-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ShieldCheck size={18} strokeWidth={2} color={m.is_admin ? '#fff' : 'var(--ink-faint)'} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.email}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 2 }}>
+                      {isSuperAdmin ? 'Super admin · always on' : m.is_admin ? 'Admin' : 'Member'}
+                    </div>
+                  </div>
+                  <Toggle on={m.is_admin} disabled={isSuperAdmin || toggling === m.email} onChange={() => toggleAdmin(m.email, m.is_admin)} />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
