@@ -26,9 +26,15 @@ async function resolveAdmin(s: Session | null): Promise<boolean> {
 
 async function touchProfile(s: Session | null) {
   if (!s?.user) return
-  await supabase.from('profiles')
-    .update({ email: s.user.email, last_seen_at: new Date().toISOString() })
-    .eq('id', s.user.id)
+  const fallbackName =
+    s.user.user_metadata?.name ??
+    s.user.user_metadata?.full_name ??
+    s.user.email?.split('@')[0] ??
+    'Unknown'
+  await supabase.from('profiles').upsert(
+    { id: s.user.id, name: fallbackName, email: s.user.email, last_seen_at: new Date().toISOString() },
+    { onConflict: 'id', ignoreDuplicates: false }
+  )
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
