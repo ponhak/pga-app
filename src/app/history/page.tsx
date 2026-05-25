@@ -376,7 +376,7 @@ export default function HistoryPage() {
   const champion      = season?.standings[0] ?? null
 
   return (
-    <div style={{ background: 'var(--tour-navy)' }}>
+    <div style={{ background: 'var(--bunker-sand)' }}>
       {/* Header */}
       <div style={{
         background: 'var(--tour-navy)',
@@ -597,7 +597,7 @@ export default function HistoryPage() {
               </section>
 
               {/* ── Leaderboard ── */}
-              <section id="history-leaderboard" style={{ background: 'var(--tour-navy)', scrollMarginTop: 56 }}>
+              <section id="history-leaderboard" style={{ background: 'var(--tour-navy)', marginTop: 15, scrollMarginTop: 56 }}>
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '10px 14px',
