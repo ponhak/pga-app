@@ -480,10 +480,11 @@ export default function HistoryPage() {
           </div>
 
           {champion && season && (
-            <div style={{ maxWidth: 480, margin: '0 auto' }}>
+            <>
 
               {/* ── Champion hero ── */}
               <section style={{ background: 'var(--tour-navy)', position: 'relative' }}>
+              <div style={{ maxWidth: 480, margin: '0 auto' }}>
 
                 {/* Status row */}
                 <div style={{ padding: '16px 16px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -594,6 +595,7 @@ export default function HistoryPage() {
                     Full leaderboard ↓
                   </a>
                 </div>
+              </div>
               </section>
 
               {/* ── Leaderboard ── */}
@@ -681,7 +683,7 @@ export default function HistoryPage() {
                 </div>
               </section>
 
-            </div>
+            </>
           )}
         </>
       )}
