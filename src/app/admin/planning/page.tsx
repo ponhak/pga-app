@@ -52,7 +52,8 @@ export default function PlanningPage() {
   const [saving, setSaving]   = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
-  const [blockMap, setBlockMap] = useState<Record<string, number>>({})
+  const [blockMap, setBlockMap]         = useState<Record<string, number>>({})
+  const [blockDetails, setBlockDetails] = useState<Record<string, string[]>>({})
 
   const isSynced = planRounds.some(r => r.linked_round_id)
 
@@ -66,17 +67,26 @@ export default function PlanningPage() {
     setPendingDeletions([])
 
     // Load availability blocks for this year to colour-code date inputs
-    const { data: blocks } = await db
-      .from('availability_blocks')
-      .select('date')
-      .gte('date', `${y}-01-01`)
-      .lte('date', `${y}-12-31`)
+    const [{ data: blocks }, { data: profiles }] = await Promise.all([
+      db.from('availability_blocks')
+        .select('date, user_id, user_email')
+        .gte('date', `${y}-01-01`)
+        .lte('date', `${y}-12-31`),
+      db.from('profiles').select('id, name'),
+    ])
+    const profileMap: Record<string, string> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const p of (profiles ?? []) as any[]) profileMap[p.id] = p.name
     const map: Record<string, number> = {}
+    const details: Record<string, string[]> = {}
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const b of (blocks ?? []) as any[]) {
       map[b.date] = (map[b.date] ?? 0) + 1
+      if (!details[b.date]) details[b.date] = []
+      details[b.date].push(profileMap[b.user_id] ?? b.user_email)
     }
     setBlockMap(map)
+    setBlockDetails(details)
     const { data: planArr } = await db
       .from('season_plans')
       .select('*')
@@ -475,12 +485,43 @@ export default function PlanningPage() {
                     onChange={e => updateRound(i, { name: e.target.value })}
                     style={{ ...inputStyle(), width: '100%' }}
                   />
-                  <input
-                    type="date"
-                    value={r.date}
-                    onChange={e => updateRound(i, { date: e.target.value })}
-                    style={{ ...inputStyle({ background: r.date ? availabilityBg(blockMap[r.date] ?? 0) : '#fff' }), width: '100%', colorScheme: 'light' }}
-                  />
+                  {(() => {
+                    const cnt = r.date ? (blockMap[r.date] ?? 0) : 0
+                    const borderColor = cnt >= 2 ? 'var(--tournament-red)' : cnt === 1 ? '#C9A24A' : 'var(--bunker-sand-deep)'
+                    const badgeBg    = cnt >= 2 ? 'var(--tournament-red)' : '#C9A24A'
+                    const names      = r.date ? (blockDetails[r.date] ?? []) : []
+                    return (
+                      <div style={{ position: 'relative', width: '100%' }}>
+                        <input
+                          type="date"
+                          value={r.date}
+                          onChange={e => updateRound(i, { date: e.target.value })}
+                          title={names.length ? `Blocked: ${names.join(', ')}` : undefined}
+                          style={{
+                            ...inputStyle({
+                              background: r.date ? availabilityBg(cnt) : '#fff',
+                              borderColor,
+                              borderWidth: cnt > 0 ? '2px' : '1.5px',
+                            }),
+                            width: '100%', colorScheme: 'light',
+                          }}
+                        />
+                        {cnt > 0 && (
+                          <span style={{
+                            position: 'absolute', top: -7, right: -7,
+                            minWidth: 18, height: 18, borderRadius: 9,
+                            background: badgeBg, color: '#fff',
+                            fontSize: 10, fontWeight: 800,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            border: '2px solid #fff', padding: '0 3px',
+                            pointerEvents: 'none', lineHeight: 1,
+                          }}>
+                            {cnt}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })()}
                   <button
                     type="button"
                     onClick={() => updateRound(i, { double_points: !r.double_points })}
