@@ -122,14 +122,6 @@ function AvailabilityDatePicker({ value, onChange, blockMap, blockDetails }: {
                   }}
                 >
                   <span style={{ fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? '#fff' : 'var(--ink)', lineHeight: 1 }}>{day}</span>
-                  {dayCnt > 0 && !isSelected && (
-                    <span style={{
-                      position: 'absolute', top: 2, right: 2, width: 12, height: 12, borderRadius: 6,
-                      background: dayCnt >= 2 ? 'var(--tournament-red)' : '#a07c1a',
-                      color: '#fff', fontSize: 7, fontWeight: 800,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>{dayCnt}</span>
-                  )}
                 </div>
               )
             })}
