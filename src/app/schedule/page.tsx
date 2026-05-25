@@ -266,8 +266,8 @@ export default function SchedulePage() {
                     </span>
                   )}
 
-                  {/* Add to calendar — upcoming rounds only */}
-                  {status === 'upcoming' && (
+                  {/* Add to calendar — upcoming rounds, logged-in users only */}
+                  {status === 'upcoming' && !!session && (
                     <button
                       onClick={e => { e.stopPropagation(); downloadICS(entry) }}
                       title="Add to calendar"
