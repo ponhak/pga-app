@@ -39,20 +39,22 @@ export default function ManageDataPage() {
   const [players, setPlayers]     = useState<Player[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
-  // Inline edit for current-year rounds
+  // Inline edit for any round
   const [editId, setEditId]             = useState<string | null>(null)
   const [editDate, setEditDate]         = useState('')
   const [editVenue, setEditVenue]       = useState('')
   const [editSaving, setEditSaving]     = useState(false)
   const [editRoundPlayers, setEditRoundPlayers] = useState<Player[]>([])
   const [editRoundScores, setEditRoundScores]   = useState<Record<string, string>>({})
+  const [editNetDiff, setEditNetDiff]           = useState<Record<string, string>>({})
   const [editScoreSaving, setEditScoreSaving]   = useState(false)
 
   // Historical round form
-  const [showHist, setShowHist]   = useState(false)
-  const [histDate, setHistDate]   = useState('')
-  const [histVenue, setHistVenue] = useState('')
+  const [showHist, setShowHist]     = useState(false)
+  const [histDate, setHistDate]     = useState('')
+  const [histVenue, setHistVenue]   = useState('')
   const [histScores, setHistScores] = useState<Record<string, string>>({})
+  const [histNetDiff, setHistNetDiff] = useState<Record<string, string>>({})
   const [histSaving, setHistSaving] = useState(false)
 
   useEffect(() => {
@@ -107,10 +109,13 @@ export default function ManageDataPage() {
     setEditRoundPlayers(rp.map(x => x.players).sort((a, b) => a.name.localeCompare(b.name)))
 
     const sc: Record<string, string> = {}
+    const nd: Record<string, string> = {}
     for (const s of (scoreData as Score[]) ?? []) {
       if (s.strokes != null) sc[s.player_id] = String(s.strokes)
+      if (s.net_diff != null) nd[s.player_id] = String(s.net_diff)
     }
     setEditRoundScores(sc)
+    setEditNetDiff(nd)
   }
 
   async function saveEditScores() {
@@ -130,13 +135,20 @@ export default function ManageDataPage() {
 
     setEditScoreSaving(true)
     const results = assignPoints(entries.map(({ playerId, strokes }) => ({ playerId, strokes })))
-    const upserts = results.map(r => ({
-      round_id:      editId,
-      player_id:     r.playerId,
-      strokes:       r.strokes,
-      points_earned: r.points,
-      rank:          r.rank,
-    }))
+    const upserts = results.map(r => {
+      const player = editRoundPlayers.find(p => p.id === r.playerId)
+      const hcp = player?.hcp ?? null
+      const nd = editNetDiff[r.playerId]?.trim()
+      return {
+        round_id:      editId,
+        player_id:     r.playerId,
+        strokes:       r.strokes,
+        gross_strokes: hcp != null ? r.strokes + hcp : null,
+        net_diff:      nd !== '' && nd != null ? parseInt(nd) : null,
+        points_earned: r.points,
+        rank:          r.rank,
+      }
+    })
     const { error } = await db.from('scores').upsert(upserts, { onConflict: 'round_id,player_id' })
     if (error) {
       toast.error(error.message)
@@ -233,13 +245,20 @@ export default function ManageDataPage() {
     )
 
     const { error: scoreErr } = await db.from('scores').insert(
-      results.map(r => ({
-        round_id:      newRound.id,
-        player_id:     r.playerId,
-        strokes:       r.strokes,
-        points_earned: r.points,
-        rank:          r.rank,
-      }))
+      results.map(r => {
+        const player = players.find(p => p.id === r.playerId)
+        const hcp = player?.hcp ?? null
+        const nd = histNetDiff[r.playerId]?.trim()
+        return {
+          round_id:      newRound.id,
+          player_id:     r.playerId,
+          strokes:       r.strokes,
+          gross_strokes: hcp != null ? r.strokes + hcp : null,
+          net_diff:      nd !== '' && nd != null ? parseInt(nd) : null,
+          points_earned: r.points,
+          rank:          r.rank,
+        }
+      })
     )
 
     if (scoreErr) {
@@ -250,6 +269,7 @@ export default function ManageDataPage() {
       setHistDate('')
       setHistVenue('')
       setHistScores({})
+      setHistNetDiff({})
       await loadAll()
     }
     setHistSaving(false)
@@ -372,19 +392,38 @@ export default function ManageDataPage() {
                       {editRoundPlayers.length > 0 && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                           <div style={{ height: 1, background: 'var(--bunker-sand-deep)' }} />
-                          <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Net Scores</label>
-                          {editRoundPlayers.map(p => (
-                            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
-                              <input
-                                type="number" min={40} max={130}
-                                value={editRoundScores[p.id] ?? ''}
-                                onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))}
-                                placeholder="—"
-                                style={{ width: 72, height: 38, padding: '0 10px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 15, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
-                              />
-                            </div>
-                          ))}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
+                          </div>
+                          {editRoundPlayers.map(p => {
+                            const net = parseInt(editRoundScores[p.id] ?? '')
+                            const gross = !isNaN(net) && p.hcp != null ? net + p.hcp : null
+                            return (
+                              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
+                                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
+                                <input
+                                  type="number" min={40} max={130}
+                                  value={editRoundScores[p.id] ?? ''}
+                                  onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                  placeholder="—"
+                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
+                                />
+                                <input
+                                  type="number" min={-50} max={50}
+                                  value={editNetDiff[p.id] ?? ''}
+                                  onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                  placeholder="—"
+                                  style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
+                                />
+                                <div style={{ height: 38, borderRadius: 8, background: 'var(--bunker-sand)', border: '1.5px solid var(--bunker-sand-deep)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 8px', fontFamily: 'var(--font-mono)', fontSize: 14, color: gross != null ? 'var(--ink)' : 'var(--ink-faint)' }}>
+                                  {gross != null ? gross : '—'}
+                                </div>
+                              </div>
+                            )
+                          })}
                           <button onClick={saveEditScores} disabled={editScoreSaving}
                             style={{ height: 38, borderRadius: 8, border: 0, background: editScoreSaving ? '#ccc' : 'var(--fairway-green)', color: '#fff', fontWeight: 700, fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase', cursor: editScoreSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                             <Check size={14} strokeWidth={2.5} /> {editScoreSaving ? 'Saving…' : 'Save & Recalculate Points'}
@@ -461,21 +500,40 @@ export default function ManageDataPage() {
 
                 {/* Net scores per player */}
                 <div>
-                  <label style={label()}>Net Scores (leave blank to exclude a player)</label>
+                  <label style={label()}>Scores (leave Net blank to exclude a player)</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {players.map(p => (
-                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
-                        <input
-                          type="number"
-                          min={40} max={130}
-                          value={histScores[p.id] ?? ''}
-                          onChange={e => setHistScores(prev => ({ ...prev, [p.id]: e.target.value }))}
-                          placeholder="—"
-                          style={{ width: 72, height: 40, padding: '0 10px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 15, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
-                        />
-                      </div>
-                    ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
+                    </div>
+                    {players.map(p => {
+                      const net = parseInt(histScores[p.id] ?? '')
+                      const gross = !isNaN(net) && p.hcp != null ? net + p.hcp : null
+                      return (
+                        <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
+                          <input
+                            type="number" min={40} max={130}
+                            value={histScores[p.id] ?? ''}
+                            onChange={e => setHistScores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                            placeholder="—"
+                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
+                          />
+                          <input
+                            type="number" min={-50} max={50}
+                            value={histNetDiff[p.id] ?? ''}
+                            onChange={e => setHistNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))}
+                            placeholder="—"
+                            style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }}
+                          />
+                          <div style={{ height: 40, borderRadius: 8, background: 'var(--bunker-sand)', border: '1.5px solid var(--bunker-sand-deep)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 8px', fontFamily: 'var(--font-mono)', fontSize: 14, color: gross != null ? 'var(--ink)' : 'var(--ink-faint)' }}>
+                            {gross != null ? gross : '—'}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
@@ -497,20 +555,80 @@ export default function ManageDataPage() {
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 8 }}>{year}</div>
                   <div style={card}>
                     {pastByYear[year].map((r, i, arr) => (
-                      <Link key={r.id} href={`/rounds/${r.id}`}
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: i < arr.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', textDecoration: 'none' }}>
-                        <DateBadge date={r.date} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{formatDate(r.date)}</div>
-                          <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 1 }}>{r.notes ?? 'No venue'}</div>
-                        </div>
-                        {r.scoreCount > 0 ? (
-                          <span style={{ height: 20, padding: '0 8px', borderRadius: 999, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', background: 'rgba(31,122,76,.14)', color: 'var(--fairway-green)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>{r.scoreCount} scored</span>
+                      <div key={r.id} style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}>
+                        {editId === r.id ? (
+                          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Edit Round</span>
+                              <button type="button" onClick={() => setEditId(null)} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-faint)', padding: 4 }}>
+                                <X size={16} strokeWidth={2} />
+                              </button>
+                            </div>
+                            <form onSubmit={saveEdit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                <div>
+                                  <label style={label({ fontSize: 10 })}>Date</label>
+                                  <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} max={today} required style={textInput({ height: 40, fontSize: 14 })} />
+                                </div>
+                                <div>
+                                  <label style={label({ fontSize: 10 })}>Venue</label>
+                                  <input type="text" value={editVenue} onChange={e => setEditVenue(e.target.value)} placeholder="e.g. Schager GK" style={textInput({ height: 40, fontSize: 14 })} />
+                                </div>
+                              </div>
+                              <button type="submit" disabled={editSaving} style={{ height: 38, borderRadius: 8, border: 0, background: editSaving ? '#ccc' : 'var(--tour-navy)', color: '#F5EFE0', fontWeight: 700, fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase', cursor: editSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                <Check size={14} strokeWidth={2.5} /> {editSaving ? 'Saving…' : 'Save Details'}
+                              </button>
+                            </form>
+                            {editRoundPlayers.length > 0 && (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <div style={{ height: 1, background: 'var(--bunker-sand-deep)' }} />
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
+                                </div>
+                                {editRoundPlayers.map(p => {
+                                  const net = parseInt(editRoundScores[p.id] ?? '')
+                                  const gross = !isNaN(net) && p.hcp != null ? net + p.hcp : null
+                                  return (
+                                    <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px', gap: 8, alignItems: 'center' }}>
+                                      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{p.name}</span>
+                                      <input type="number" min={40} max={130} value={editRoundScores[p.id] ?? ''} onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                                      <input type="number" min={-50} max={50} value={editNetDiff[p.id] ?? ''} onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box' }} />
+                                      <div style={{ height: 38, borderRadius: 8, background: 'var(--bunker-sand)', border: '1.5px solid var(--bunker-sand-deep)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 8px', fontFamily: 'var(--font-mono)', fontSize: 14, color: gross != null ? 'var(--ink)' : 'var(--ink-faint)' }}>
+                                        {gross != null ? gross : '—'}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                                <button onClick={saveEditScores} disabled={editScoreSaving} style={{ height: 38, borderRadius: 8, border: 0, background: editScoreSaving ? '#ccc' : 'var(--fairway-green)', color: '#fff', fontWeight: 700, fontSize: 12, letterSpacing: '.06em', textTransform: 'uppercase', cursor: editScoreSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                  <Check size={14} strokeWidth={2.5} /> {editScoreSaving ? 'Saving…' : 'Save & Recalculate Points'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         ) : (
-                          <span style={{ height: 20, padding: '0 8px', borderRadius: 999, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', background: 'rgba(10,34,64,.08)', color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>Pending</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
+                            <DateBadge date={r.date} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>{formatDate(r.date)}</div>
+                              <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 1 }}>{r.notes ?? 'No venue'}</div>
+                            </div>
+                            {r.scoreCount > 0 ? (
+                              <span style={{ height: 20, padding: '0 8px', borderRadius: 999, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', background: 'rgba(31,122,76,.14)', color: 'var(--fairway-green)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>{r.scoreCount} scored</span>
+                            ) : (
+                              <span style={{ height: 20, padding: '0 8px', borderRadius: 999, fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', background: 'rgba(10,34,64,.08)', color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>Pending</span>
+                            )}
+                            <button onClick={() => startEdit(r)} style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--bunker-sand-deep)', background: 'transparent', color: 'var(--ink-soft)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Pencil size={13} strokeWidth={2} />
+                            </button>
+                            <button onClick={() => deleteRound(r)} style={{ width: 32, height: 32, borderRadius: 6, border: '1px solid var(--bunker-sand-deep)', background: 'transparent', color: 'var(--tournament-red)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Trash2 size={13} strokeWidth={2} />
+                            </button>
+                          </div>
                         )}
-                        <ChevronRight size={14} color="var(--ink-faint)" strokeWidth={2} />
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 </div>
