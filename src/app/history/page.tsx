@@ -3,7 +3,8 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronDown, ChevronUp, ChevronRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { Player, Round, Score } from '@/lib/database.types'
 import { PlayerAvatar } from '@/components/PlayerAvatar'
@@ -674,6 +675,64 @@ export default function HistoryPage() {
                           />
                         )}
                       </div>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* ── Rounds ── */}
+              <section style={{ padding: '20px 16px 24px', background: 'var(--bunker-sand)' }}>
+                <div className="eyebrow" style={{ marginBottom: 12 }}>{selectedYear} Rounds</div>
+                <div style={{
+                  background: '#fff',
+                  border: '1px solid var(--bunker-sand-deep)',
+                  borderRadius: 12,
+                  boxShadow: 'var(--shadow-card)',
+                  overflow: 'hidden',
+                }}>
+                  {[...season.rounds].reverse().map(({ id, date, notes, double_points }, i, arr) => {
+                    const playerCount = new Set(season.scores.filter(s => s.round_id === id && s.strokes != null).map(s => s.player_id)).size
+                    const d = new Date(date + 'T12:00:00')
+                    return (
+                      <Link
+                        key={id}
+                        href={`/rounds/${id}`}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '14px 16px',
+                          borderBottom: i < arr.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <div style={{
+                          width: 44, height: 44, background: 'var(--tour-navy)', borderRadius: 8,
+                          color: '#F5EFE0', display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        }}>
+                          <div style={{ fontSize: 9, letterSpacing: '.10em', fontWeight: 700 }}>
+                            {d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase()}
+                          </div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, lineHeight: 1 }}>
+                            {d.getDate()}
+                          </div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, textTransform: 'uppercase', color: 'var(--ink)', letterSpacing: '.02em' }}>
+                            {d.toLocaleDateString('en-GB', { weekday: 'long' })}
+                            {double_points && <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--trophy-gold)' }}>⚡ Double</span>}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>
+                            {notes ? `${notes} · ` : ''}{playerCount} player{playerCount !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+                        <span style={{
+                          height: 22, padding: '0 9px', borderRadius: 999,
+                          fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase',
+                          background: 'rgba(31,122,76,.14)', color: 'var(--fairway-green)',
+                          display: 'flex', alignItems: 'center',
+                        }}>Scored</span>
+                        <ChevronRight size={16} color="var(--ink-faint)" strokeWidth={2} />
+                      </Link>
                     )
                   })}
                 </div>
