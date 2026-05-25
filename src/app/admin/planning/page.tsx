@@ -307,6 +307,12 @@ export default function PlanningPage() {
             double_points: r.double_points,
           }).select('id').single()
           if (error) throw error
+          // Send calendar invite for newly created rounds
+          fetch('/api/send-calendar-invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roundId: data.id }),
+          }).catch(() => {})
           return { ...r, linked_round_id: data.id as string }
         }
       }))

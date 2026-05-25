@@ -92,6 +92,12 @@ export default function NewRoundPage() {
       }
 
       toast.success('Round created!')
+      // Fire-and-forget calendar invite — don't block navigation on failure
+      fetch('/api/send-calendar-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roundId: round.id }),
+      }).catch(() => {})
       router.push(`/rounds/${round.id}`)
     } catch {
       toast.error('Failed to create round')

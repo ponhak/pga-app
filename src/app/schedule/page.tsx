@@ -5,9 +5,10 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { CalendarDays, ChevronRight, MapPin, Pencil, X, Save } from 'lucide-react'
+import { CalendarDays, CalendarPlus, ChevronRight, MapPin, Pencil, X, Save } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { toast } from 'sonner'
+import { generateICS } from '@/lib/calendar'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
@@ -122,6 +123,7 @@ export default function SchedulePage() {
   async function saveEdit(e: React.MouseEvent) {
     e.stopPropagation()
     if (!editingId) return
+    const entry = rounds.find(r => r.id === editingId)
     setEditSaving(true)
     const { error } = await db.from('rounds').update({
       date: editDate || undefined,
@@ -132,10 +134,33 @@ export default function SchedulePage() {
       toast.error(error.message)
     } else {
       toast.success('Round updated')
+      // Send updated invite if date, tee time, or venue changed
+      if (entry && (editDate !== entry.date || editTeeTime !== (entry.tee_time ?? '') || editVenue !== (entry.notes ?? ''))) {
+        fetch('/api/send-calendar-invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roundId: editingId }),
+        }).catch(() => {})
+      }
       setEditingId(null)
       await load()
     }
     setEditSaving(false)
+  }
+
+  function downloadICS(entry: RoundEntry) {
+    try {
+      const ics = generateICS({ id: entry.id, date: entry.date, tee_time: entry.tee_time, notes: entry.notes })
+      const blob = new Blob([ics], { type: 'text/calendar' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pga-round-${entry.date}.ics`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to generate calendar file')
+    }
   }
 
   const upcoming = rounds
@@ -239,6 +264,21 @@ export default function SchedulePage() {
                     }}>
                       {st.label}
                     </span>
+                  )}
+
+                  {/* Add to calendar — upcoming rounds only */}
+                  {status === 'upcoming' && (
+                    <button
+                      onClick={e => { e.stopPropagation(); downloadICS(entry) }}
+                      title="Add to calendar"
+                      style={{
+                        flexShrink: 0, width: 30, height: 30, borderRadius: 6, border: 0,
+                        background: 'transparent', color: 'var(--ink-faint)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <CalendarPlus size={14} strokeWidth={2} />
+                    </button>
                   )}
 
                   {canEdit ? (
