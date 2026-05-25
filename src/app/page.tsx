@@ -471,7 +471,7 @@ export default function DashboardPage() {
                       position: 'absolute', left: '50%', top: 0,
                       transform: 'translateX(-50%)',
                       height: '100%', width: 'min(56%, 260px)',
-                      objectFit: 'cover', objectPosition: 'center 20%',
+                      objectFit: 'cover', objectPosition: 'center 30%',
                     }}
                   />
                 ) : (
