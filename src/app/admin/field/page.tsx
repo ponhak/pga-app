@@ -151,6 +151,12 @@ export default function FieldPage() {
     fileInputRef.current?.click()
   }
 
+  async function removeAvatar(playerId: string) {
+    const { error } = await db.from('players').update({ avatar_url: null }).eq('id', playerId)
+    if (error) { toast.error('Failed to remove photo') }
+    else { toast.success('Photo removed'); await loadAll() }
+  }
+
   async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -299,11 +305,22 @@ export default function FieldPage() {
                   <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
 
                     {/* Avatar */}
-                    <div onClick={() => triggerAvatarUpload(p.id)} style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
-                      <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={52} />
-                      <div style={{ position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: isUploading ? 'var(--ink-faint)' : 'var(--tour-navy)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Camera size={9} color="#fff" strokeWidth={2} />
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <div onClick={() => triggerAvatarUpload(p.id)} style={{ cursor: 'pointer' }}>
+                        <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={52} />
+                        <div style={{ position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: isUploading ? 'var(--ink-faint)' : 'var(--tour-navy)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Camera size={9} color="#fff" strokeWidth={2} />
+                        </div>
                       </div>
+                      {p.avatar_url && (
+                        <button
+                          onClick={() => removeAvatar(p.id)}
+                          aria-label="Remove photo"
+                          style={{ position: 'absolute', top: -4, left: -4, width: 18, height: 18, borderRadius: '50%', border: '2px solid #fff', background: 'var(--tournament-red, #c0392b)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                        >
+                          <X size={9} strokeWidth={3} />
+                        </button>
+                      )}
                     </div>
 
                     {/* Main info */}
