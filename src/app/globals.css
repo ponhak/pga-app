@@ -193,6 +193,16 @@
   text-transform: uppercase;
 }
 
+/* ---- Hero section top padding (clears mobile NavBar logo overhang) ---- */
+.hero-top-pad {
+  padding-top: 68px;
+}
+@media (min-width: 768px) {
+  .hero-top-pad {
+    padding-top: 16px;
+  }
+}
+
 /* ---- Main content bottom padding (accounts for mobile tab bar) ---- */
 .main-content-pad {
   padding-bottom: max(80px, calc(64px + env(safe-area-inset-bottom, 0px)));

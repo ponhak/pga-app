@@ -418,14 +418,13 @@ export default function DashboardPage() {
     <div>
       {/* ── Hero ── */}
       <section
-        className="bg-dimple"
+        className="bg-dimple hero-top-pad"
         style={{
           background: 'var(--tour-navy)',
-          padding: '68px 0 0',
           position: 'relative',
         }}
       >
-        <div className="max-w-[480px] md:max-w-none md:mx-0">
+        <div style={{ maxWidth: 480, margin: '0 auto' }}>
         {/* Status row */}
         <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{

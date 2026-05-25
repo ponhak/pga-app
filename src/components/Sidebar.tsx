@@ -2,9 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, CalendarDays, Trophy, CalendarRange, UserCircle, LogIn, LogOut, ShieldCheck } from 'lucide-react'
+import { Home, CalendarDays, Trophy, CalendarRange, LogIn, LogOut, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
-import { OwlLogo } from '@/components/OwlLogo'
 import { supabase } from '@/lib/supabase'
 
 const BASE_TABS = [
@@ -52,33 +51,10 @@ export function Sidebar() {
       }}
     >
       {/* Brand */}
-      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <OwlLogo size={36} />
-          <div>
-            <div style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 700,
-              fontSize: 15,
-              letterSpacing: '.06em',
-              textTransform: 'uppercase',
-              color: '#F5EFE0',
-              lineHeight: 1.1,
-            }}>
-              PGA
-            </div>
-            <div style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 700,
-              fontSize: 15,
-              letterSpacing: '.06em',
-              textTransform: 'uppercase',
-              color: '#F5EFE0',
-              lineHeight: 1.1,
-            }}>
-              Schager
-            </div>
-          </div>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="PGA Schager" style={{ height: 52, width: 'auto' }} />
         </Link>
       </div>
 
