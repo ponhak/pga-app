@@ -432,9 +432,9 @@ export default function DashboardPage() {
         {/* Leader hero card */}
         {leader && hasData && (
           <>
-            <div style={{ position: 'relative', height: 280, overflow: 'hidden', background: 'var(--tour-navy)' }}>
+            <div style={{ position: 'relative', height: 280, background: 'var(--tour-navy)' }}>
 
-              {/* Owl torso watermark — left side, behind everything */}
+              {/* Owl torso — not clipped, bleeds outside card on desktop */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/owl-torso.png"
@@ -443,44 +443,11 @@ export default function DashboardPage() {
                 style={{
                   position: 'absolute', left: '-25%', top: '50%', transform: 'translateY(-50%)',
                   height: '130%', width: 'auto', maxWidth: 'none',
-                  opacity: 0.12, pointerEvents: 'none',
+                  opacity: 0.12, pointerEvents: 'none', zIndex: 0,
                 }}
               />
 
-              {/* Player photo — centered */}
-              {leader.player.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={leader.player.avatar_url}
-                  alt={leader.player.name}
-                  style={{
-                    position: 'absolute', left: '50%', top: 0,
-                    transform: 'translateX(-50%)',
-                    height: '100%', width: '56%',
-                    objectFit: 'cover', objectPosition: 'top center',
-                  }}
-                />
-              ) : (
-                <div style={{
-                  position: 'absolute', left: '50%', top: 0,
-                  transform: 'translateX(-50%)',
-                  height: '100%', width: '56%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: 'var(--font-display)', fontSize: 120, fontWeight: 700,
-                  color: 'rgba(255,255,255,.08)', lineHeight: 1, userSelect: 'none',
-                }}>
-                  {leader.player.name[0].toUpperCase()}
-                </div>
-              )}
-
-              {/* Bottom gradient */}
-              <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%',
-                background: 'linear-gradient(to top, rgba(10,34,64,.75) 0%, transparent 100%)',
-                pointerEvents: 'none',
-              }} />
-
-              {/* Trophy — right of player, in front */}
+              {/* Trophy — not clipped, bleeds outside card on desktop */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/owl-trophy.png"
@@ -488,14 +455,48 @@ export default function DashboardPage() {
                 style={{
                   position: 'absolute', right: '-12%', bottom: '-6%',
                   height: '106%', width: 'auto',
-                  opacity: 0.12,
-                  pointerEvents: 'none',
+                  opacity: 0.12, pointerEvents: 'none', zIndex: 0,
                 }}
               />
 
-              {/* Stat boxes */}
+              {/* Clipping wrapper — player photo + gradient only */}
+              <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 1 }}>
+                {leader.player.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={leader.player.avatar_url}
+                    alt={leader.player.name}
+                    style={{
+                      position: 'absolute', left: '50%', top: 0,
+                      transform: 'translateX(-50%)',
+                      height: '100%', width: '56%',
+                      objectFit: 'cover', objectPosition: 'top center',
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    position: 'absolute', left: '50%', top: 0,
+                    transform: 'translateX(-50%)',
+                    height: '100%', width: '56%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-display)', fontSize: 120, fontWeight: 700,
+                    color: 'rgba(255,255,255,.08)', lineHeight: 1, userSelect: 'none',
+                  }}>
+                    {leader.player.name[0].toUpperCase()}
+                  </div>
+                )}
+
+                {/* Bottom gradient */}
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%',
+                  background: 'linear-gradient(to top, rgba(10,34,64,.75) 0%, transparent 100%)',
+                  pointerEvents: 'none',
+                }} />
+              </div>
+
+              {/* Stat boxes — on top of everything */}
               <div style={{
-                position: 'absolute', bottom: 8, left: 12, right: 12,
+                position: 'absolute', bottom: 8, left: 12, right: 12, zIndex: 2,
                 display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
               }}>
                 {([
