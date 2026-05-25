@@ -144,8 +144,9 @@ export default function SchedulePage() {
   const pending = rounds
     .filter(r => !r.hasScores && r.date < today)
     .sort((a, b) => b.date.localeCompare(a.date))
+  const currentYear = new Date().getFullYear().toString()
   const past = rounds
-    .filter(r => r.hasScores)
+    .filter(r => r.hasScores && r.date.startsWith(currentYear))
     .sort((a, b) => b.date.localeCompare(a.date))
 
   function renderSection(label: string, entries: RoundEntry[]) {
