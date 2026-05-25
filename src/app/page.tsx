@@ -401,7 +401,7 @@ export default function DashboardPage() {
   const hasStarted = hasData
 
   return (
-    <div>
+    <div style={{ background: 'var(--bunker-sand)' }}>
       {/* ── Hero ── */}
       <section
         className="bg-dimple hero-top-pad"
@@ -564,7 +564,7 @@ export default function DashboardPage() {
       <NextRoundCountdown playerCount={standings.length} />
 
       {/* ── Leaderboard (broadcast style) ── */}
-      <section id="leaderboard" style={{ background: 'var(--tour-navy)', marginTop: 0, scrollMarginTop: 56 }}>
+      <section id="leaderboard" style={{ background: 'var(--tour-navy)', marginTop: 15, scrollMarginTop: 56 }}>
         {/* Sub-header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',

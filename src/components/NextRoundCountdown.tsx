@@ -91,11 +91,24 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
   })
 
   return (
-    <div style={{ background: 'var(--tour-navy-deep)', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+    <div style={{ background: 'var(--tour-navy-deep)', marginTop: 15, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+      {/* Section header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 14px',
+        background: 'var(--tour-navy-deep)',
+        borderBottom: '2px solid var(--trophy-gold)',
+      }}>
+        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0' }}>
+          Next Round
+        </span>
+      </div>
+
       {/* Venue row */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
-        padding: '8px 14px 0',
+        padding: '8px 14px',
+        background: '#000',
         fontSize: 11, color: '#B9C5D9', fontWeight: 600, letterSpacing: '.08em',
       }}>
         <MapPin size={12} strokeWidth={2.5} color="#B9C5D9" />
@@ -136,7 +149,7 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
               </div>
               <div style={{
                 fontSize: 9, fontWeight: 700, letterSpacing: '.14em',
-                textTransform: 'uppercase', color: '#8895AC', marginTop: 2,
+                textTransform: 'uppercase', color: '#8895AC', marginTop: 15,
               }}>
                 {lbl}
               </div>
@@ -201,7 +214,7 @@ export function NextRoundCountdown({ playerCount }: { playerCount: number }) {
             <div style={{
               fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600,
               textTransform: 'uppercase', letterSpacing: '.04em',
-              color: '#F5EFE0', marginTop: 2,
+              color: '#F5EFE0', marginTop: 15,
             }}>
               {it.val}
             </div>
