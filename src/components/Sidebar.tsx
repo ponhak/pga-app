@@ -52,16 +52,9 @@ export function Sidebar() {
     >
       {/* Brand */}
       <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none' }}>
+        <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="PGA Schager" style={{ height: 72, width: 'auto', flexShrink: 0 }} />
-          <span style={{
-            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20,
-            textTransform: 'uppercase', letterSpacing: '.04em', lineHeight: 1,
-            color: '#fff', whiteSpace: 'nowrap',
-          }}>
-            PGA Schager
-          </span>
+          <img src="/logo.png" alt="PGA Schager" style={{ height: 120, width: 'auto' }} />
         </Link>
       </div>
 

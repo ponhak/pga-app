@@ -411,6 +411,7 @@ export default function DashboardPage() {
         }}
       >
         <div style={{ maxWidth: 480, margin: '0 auto' }}>
+
         {/* Status row */}
         <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{

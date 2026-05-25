@@ -40,11 +40,11 @@ export function NavBar() {
 
   return (
     <header
+      className="h-14 md:h-auto"
       style={{
         position: 'sticky',
         top: 0,
         zIndex: 10,
-        height: 56,
         background: '#0A2240',
         borderBottom: 'none',
         overflow: 'visible',
@@ -106,7 +106,9 @@ export function NavBar() {
           gap: 4,
         }}
       >
+        {/* Mobile: small fade-in when scrolled */}
         <div
+          className="md:hidden"
           style={{
             fontFamily: 'var(--font-display)',
             fontWeight: 700,
@@ -116,6 +118,26 @@ export function NavBar() {
             color: '#F5EFE0',
             opacity: small ? 1 : 0,
             transition: 'opacity .18s ease',
+          }}
+        >
+          PGA Schager
+        </div>
+
+        {/* Desktop: large centered, always visible */}
+        <div
+          className="hidden md:block"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 700,
+            fontSize: 64,
+            lineHeight: 1,
+            letterSpacing: '.02em',
+            textTransform: 'uppercase',
+            color: '#fff',
+            textAlign: 'center',
+            whiteSpace: 'nowrap',
+            userSelect: 'none',
+            padding: '12px 0',
           }}
         >
           PGA Schager
