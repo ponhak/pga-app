@@ -15,9 +15,8 @@ import { ADMIN_EMAIL } from '@/lib/auth'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
 
-interface Member {
+interface MemberInfo {
   email: string
-  added_at: string
   is_admin: boolean
 }
 
@@ -32,20 +31,15 @@ function Toggle({ on, disabled, onChange }: { on: boolean; disabled: boolean; on
         background: on ? 'var(--fairway-green)' : 'var(--bunker-sand-deep)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.4 : 1,
-        position: 'relative',
-        flexShrink: 0,
+        position: 'relative', flexShrink: 0,
         transition: 'background .18s',
       }}
     >
       <span style={{
-        position: 'absolute',
-        top: 3, left: on ? 21 : 3,
-        width: 20, height: 20,
-        borderRadius: '50%',
-        background: '#fff',
-        boxShadow: '0 1px 3px rgba(0,0,0,.2)',
-        transition: 'left .18s',
-        display: 'block',
+        position: 'absolute', top: 3, left: on ? 21 : 3,
+        width: 20, height: 20, borderRadius: '50%',
+        background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+        transition: 'left .18s', display: 'block',
       }} />
     </button>
   )
@@ -55,7 +49,6 @@ export default function FieldPage() {
   const { session, loading, isAdmin } = useAuth()
   const router = useRouter()
 
-  // Field state
   const [players, setPlayers] = useState<Player[]>([])
   const [newName, setNewName] = useState('')
   const [loadingPlayers, setLoadingPlayers] = useState(true)
@@ -69,12 +62,12 @@ export default function FieldPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
 
-  // Roles state
-  const [members, setMembers] = useState<Member[]>([])
+  // name (lowercase) → { email, is_admin }
+  const [memberByName, setMemberByName] = useState<Record<string, MemberInfo>>({})
   const [toggling, setToggling] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isAdmin) { loadPlayers(); loadMembers() }
+    if (isAdmin) { loadPlayers(); loadMemberMap() }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 
@@ -94,10 +87,30 @@ export default function FieldPage() {
     setLoadingPlayers(false)
   }
 
-  async function loadMembers() {
-    const { data, error } = await db.from('allowed_emails').select('email, added_at, is_admin').order('added_at')
-    if (error) { toast.error('Failed to load members'); return }
-    setMembers(data ?? [])
+  async function loadMemberMap() {
+    const [{ data: blocks }, { data: profiles }, { data: emailData }] = await Promise.all([
+      db.from('availability_blocks').select('user_id, user_email'),
+      db.from('profiles').select('id, name'),
+      db.from('allowed_emails').select('email, is_admin'),
+    ])
+
+    // email → is_admin
+    const adminByEmail: Record<string, boolean> = {}
+    for (const e of (emailData ?? [])) adminByEmail[e.email] = e.is_admin
+
+    // user_id → email (from blocks, first occurrence)
+    const emailByUserId: Record<string, string> = {}
+    for (const b of (blocks ?? [])) if (!emailByUserId[b.user_id]) emailByUserId[b.user_id] = b.user_email
+
+    // name (lower) → { email, is_admin }
+    const map: Record<string, MemberInfo> = {}
+    for (const p of (profiles ?? [])) {
+      const email = emailByUserId[p.id]
+      if (email && p.name && adminByEmail[email] !== undefined) {
+        map[p.name.toLowerCase()] = { email, is_admin: adminByEmail[email] }
+      }
+    }
+    setMemberByName(map)
   }
 
   async function addPlayer(e: React.FormEvent) {
@@ -178,7 +191,7 @@ export default function FieldPage() {
       .select('email', { count: 'exact', head: true })
     if (error) { toast.error(error.message) }
     else if (count === 0) { toast.error('Permission denied — check Supabase RLS policies') }
-    else { toast.success(`${email} is ${!current ? 'now an admin' : 'no longer an admin'}`); await loadMembers() }
+    else { toast.success(`${email} is ${!current ? 'now an admin' : 'no longer an admin'}`); await loadMemberMap() }
     setToggling(null)
   }
 
@@ -214,13 +227,8 @@ export default function FieldPage() {
         </div>
       </div>
 
-      {/* ── Field section ── */}
-      <div style={{ padding: '20px 16px 0' }}>
-        <div className="eyebrow" style={{ marginBottom: 12 }}>The Field</div>
-      </div>
-
       {/* Search + add */}
-      <div style={{ padding: '0 16px 12px', display: 'flex', gap: 10, alignItems: 'center' }}>
+      <div style={{ padding: '20px 16px 12px', display: 'flex', gap: 10, alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <Search size={18} strokeWidth={2} color="var(--ink-faint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           <input
@@ -237,12 +245,7 @@ export default function FieldPage() {
         </div>
         <button
           onClick={() => setShowAdd(v => !v)}
-          style={{
-            width: 44, height: 44, borderRadius: 8, flexShrink: 0,
-            background: showAdd ? 'var(--tour-navy-soft)' : 'var(--tour-navy)',
-            border: 0, color: '#F5EFE0', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
+          style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0, background: showAdd ? 'var(--tour-navy-soft)' : 'var(--tour-navy)', border: 0, color: '#F5EFE0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           aria-label={showAdd ? 'Cancel' : 'Add player'}
         >
           {showAdd ? <X size={18} strokeWidth={2} /> : <Plus size={18} strokeWidth={2} />}
@@ -252,29 +255,13 @@ export default function FieldPage() {
       {showAdd && (
         <form onSubmit={addPlayer} style={{ padding: '0 16px 12px', display: 'flex', gap: 10 }}>
           <input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Player name"
-            maxLength={50}
-            autoFocus
-            style={{
-              flex: 1, height: 44, padding: '0 14px',
-              borderRadius: 8, border: '1.5px solid var(--tour-navy)',
-              background: '#fff', color: 'var(--ink)',
-              fontFamily: 'var(--font-body)', fontSize: 15, outline: 'none', boxSizing: 'border-box',
-            }}
+            value={newName} onChange={e => setNewName(e.target.value)}
+            placeholder="Player name" maxLength={50} autoFocus
+            style={{ flex: 1, height: 44, padding: '0 14px', borderRadius: 8, border: '1.5px solid var(--tour-navy)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-body)', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
           />
           <button
-            type="submit"
-            disabled={adding || !newName.trim()}
-            style={{
-              height: 44, padding: '0 20px', borderRadius: 8, border: 0,
-              background: adding || !newName.trim() ? '#ccc' : 'var(--tour-navy)',
-              color: '#F5EFE0', fontFamily: 'var(--font-body)', fontWeight: 700,
-              fontSize: 14, letterSpacing: '.04em',
-              cursor: adding || !newName.trim() ? 'not-allowed' : 'pointer',
-              textTransform: 'uppercase',
-            }}
+            type="submit" disabled={adding || !newName.trim()}
+            style={{ height: 44, padding: '0 20px', borderRadius: 8, border: 0, background: adding || !newName.trim() ? '#ccc' : 'var(--tour-navy)', color: '#F5EFE0', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 14, letterSpacing: '.04em', cursor: adding || !newName.trim() ? 'not-allowed' : 'pointer', textTransform: 'uppercase' }}
           >
             {adding ? 'Adding…' : 'Add'}
           </button>
@@ -283,7 +270,7 @@ export default function FieldPage() {
 
       <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarFile} />
 
-      <div style={{ padding: '0 16px 32px' }}>
+      <div style={{ padding: '0 16px 40px' }}>
         {loadingPlayers ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--ink-faint)', fontSize: 14 }}>Loading…</div>
         ) : filtered.length === 0 ? (
@@ -294,8 +281,12 @@ export default function FieldPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" style={{ gap: 10 }}>
             {filtered.map(p => {
               const isUploading = uploadingFor === p.id
+              const member = memberByName[p.name.toLowerCase()]
+              const isSuperAdmin = member?.email === ADMIN_EMAIL
               return (
                 <div key={p.id} style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+                  {/* Avatar */}
                   <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', padding: '16px 16px 10px' }}>
                     <div onClick={() => triggerAvatarUpload(p.id)} style={{ position: 'relative', cursor: 'pointer' }}>
                       <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={72} />
@@ -305,15 +296,38 @@ export default function FieldPage() {
                     </div>
                     <button
                       onClick={() => deletePlayer(p)}
-                      style={{ position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 6, flexShrink: 0, background: 'transparent', border: '1px solid var(--bunker-sand-deep)', color: 'var(--ink-faint)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      style={{ position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 6, background: 'transparent', border: '1px solid var(--bunker-sand-deep)', color: 'var(--ink-faint)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                       aria-label={`Remove ${p.name}`}
                     >
                       <X size={13} strokeWidth={2} />
                     </button>
                   </div>
+
+                  {/* Name */}
                   <div style={{ textAlign: 'center', padding: '0 12px', minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
                   </div>
+
+                  {/* Account row (if member has account) */}
+                  {member && (
+                    <div style={{ margin: '8px 12px 0', padding: '8px 10px', borderRadius: 8, background: member.is_admin ? 'rgba(31,122,76,.07)' : 'var(--bunker-sand)', border: `1px solid ${member.is_admin ? 'rgba(31,122,76,.18)' : 'var(--bunker-sand-deep)'}` }}>
+                      <div style={{ fontSize: 10, color: 'var(--ink-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>
+                        {member.email}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: member.is_admin ? 'var(--fairway-green)' : 'var(--ink-faint)' }}>
+                          {isSuperAdmin ? 'Super admin' : member.is_admin ? 'Admin' : 'Member'}
+                        </span>
+                        <Toggle
+                          on={member.is_admin}
+                          disabled={isSuperAdmin || toggling === member.email}
+                          onChange={() => toggleAdmin(member.email, member.is_admin)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* HCP + Aliases */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>HCP</span>
@@ -322,16 +336,8 @@ export default function FieldPage() {
                         value={hcpEdits[p.id] ?? ''}
                         onChange={e => setHcpEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
                         onBlur={() => saveHcp(p.id)}
-                        placeholder="—"
-                        disabled={savingHcp === p.id}
-                        style={{
-                          width: 54, height: 28, textAlign: 'center',
-                          borderRadius: 6, border: '1px solid var(--bunker-sand-deep)',
-                          background: hcpEdits[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)',
-                          color: hcpEdits[p.id] ? '#F5EFE0' : 'var(--ink)',
-                          fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 14,
-                          outline: 'none', boxSizing: 'border-box',
-                        }}
+                        placeholder="—" disabled={savingHcp === p.id}
+                        style={{ width: 54, height: 28, textAlign: 'center', borderRadius: 6, border: '1px solid var(--bunker-sand-deep)', background: hcpEdits[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)', color: hcpEdits[p.id] ? '#F5EFE0' : 'var(--ink)', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -354,51 +360,17 @@ export default function FieldPage() {
                         onChange={e => setNicknameEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
                         onKeyDown={e => { if (e.key === 'Enter') addAlias(p.id, nicknameEdits[p.id] ?? '') }}
                         onBlur={() => { if (nicknameEdits[p.id]?.trim()) addAlias(p.id, nicknameEdits[p.id] ?? '') }}
-                        placeholder="+ add alias"
-                        disabled={savingNicknames === p.id}
+                        placeholder="+ add alias" disabled={savingNicknames === p.id}
                         style={{ width: '100%', height: 26, padding: '0 8px', textAlign: 'center', borderRadius: 6, border: '1px dashed var(--bunker-sand-deep)', background: 'transparent', color: 'var(--ink-soft)', fontFamily: 'var(--font-mono)', fontSize: 10, outline: 'none', boxSizing: 'border-box' }}
                       />
                     </div>
                   </div>
+
                 </div>
               )
             })}
           </div>
         )}
-      </div>
-
-      {/* ── User Roles section ── */}
-      <div style={{ padding: '0 16px 8px', borderTop: '1px solid var(--bunker-sand-deep)' }}>
-        <div className="eyebrow" style={{ marginBottom: 4, paddingTop: 20 }}>User Roles</div>
-        <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 14 }}>
-          Toggle admin access for approved members. The super admin cannot be changed.
-        </div>
-      </div>
-      <div style={{ padding: '0 16px 40px' }}>
-        <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
-          {members.length === 0 ? (
-            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--ink-faint)', fontSize: 14 }}>No approved members yet.</div>
-          ) : (
-            members.map((m, i) => {
-              const isSuperAdmin = m.email === ADMIN_EMAIL
-              const isToggling = toggling === m.email
-              return (
-                <div key={m.email} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: i < members.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', background: m.is_admin ? 'rgba(31,122,76,.04)' : 'transparent' }}>
-                  <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: m.is_admin ? 'var(--fairway-green)' : 'var(--bunker-sand-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <ShieldCheck size={18} strokeWidth={2} color={m.is_admin ? '#fff' : 'var(--ink-faint)'} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.email}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 2 }}>
-                      {isSuperAdmin ? 'Super admin · always on' : m.is_admin ? 'Admin' : 'Member'}
-                    </div>
-                  </div>
-                  <Toggle on={m.is_admin} disabled={isSuperAdmin || isToggling} onChange={() => toggleAdmin(m.email, m.is_admin)} />
-                </div>
-              )
-            })
-          )}
-        </div>
       </div>
     </div>
   )
