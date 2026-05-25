@@ -87,7 +87,7 @@ function AvailabilityDatePicker({ value, onChange, blockMap, blockDetails }: {
           position: 'absolute', top: 42, left: 0, zIndex: 50,
           background: '#fff', border: '1px solid var(--bunker-sand-deep)',
           borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.18)',
-          padding: '12px', width: 252,
+          padding: '16px', width: 276,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <button type="button" onClick={prevMonth} style={{ width: 26, height: 26, borderRadius: 5, border: '1px solid var(--bunker-sand-deep)', background: 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1 }}>‹</button>
@@ -95,13 +95,13 @@ function AvailabilityDatePicker({ value, onChange, blockMap, blockDetails }: {
             <button type="button" onClick={nextMonth} style={{ width: 26, height: 26, borderRadius: 5, border: '1px solid var(--bunker-sand-deep)', background: 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1 }}>›</button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 }}>
             {DAY_LABELS_SHORT.map(d => (
               <div key={d} style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-faint)', padding: '2px 0' }}>{d}</div>
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
             {Array.from({ length: offset }).map((_, i) => <div key={`e${i}`} />)}
             {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
               const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
