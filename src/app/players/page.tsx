@@ -280,7 +280,7 @@ export default function PlayersPage() {
               : 'No players match your search.'}
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" style={{ gap: 10 }}>
             {filtered.map(p => {
               const isUploading = uploadingFor === p.id
               return (

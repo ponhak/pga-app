@@ -54,6 +54,7 @@ export function NavBar() {
       <img
         src="/logo.png"
         alt="PGA Schager"
+        className="md:hidden"
         style={{
           position: 'absolute',
           left: 8,
@@ -61,16 +62,16 @@ export function NavBar() {
           height: logoHeight,
           width: 'auto',
           zIndex: 20,
-          display: 'block',
           border: 0,
           transition: 'height .22s ease, top .22s ease',
         }}
       />
 
-      {/* Large overhanging title — home page at rest only */}
+      {/* Large overhanging title — home page at rest only, mobile only */}
       {isHome && (
         <div
           aria-hidden
+          className="md:hidden"
           style={{
             position: 'absolute',
             left: 110,
@@ -95,12 +96,12 @@ export function NavBar() {
 
       {/* Title + user icon */}
       <div
+        className="pl-16 md:pl-4"
         style={{
           height: '100%',
           display: 'grid',
           gridTemplateColumns: '1fr auto',
           alignItems: 'center',
-          paddingLeft: 64,
           paddingRight: 6,
           gap: 4,
         }}

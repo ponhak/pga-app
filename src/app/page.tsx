@@ -152,6 +152,9 @@ function PlayerStatsPanel({
   return (
     <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', background: 'rgba(5,15,30,.6)' }}>
 
+      {/* On desktop: season stats (left) + chart (right) side-by-side */}
+      <div className="md:grid md:grid-cols-[1fr_320px]">
+
       {/* Season section */}
       <div style={{ padding: '14px 14px 0' }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#F5EFE0', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.12)' }}>
@@ -234,6 +237,8 @@ function PlayerStatsPanel({
           </div>
         </div>
       )}
+
+      </div>{/* end md:grid */}
 
       {/* Round table */}
       <div style={{ padding: '10px 14px 0' }}>
@@ -420,7 +425,7 @@ export default function DashboardPage() {
           position: 'relative',
         }}
       >
-        <div style={{ maxWidth: 480, margin: '0 auto' }}>
+        <div className="max-w-[480px] md:max-w-none md:mx-0">
         {/* Status row */}
         <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{

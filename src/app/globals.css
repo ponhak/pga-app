@@ -193,6 +193,16 @@
   text-transform: uppercase;
 }
 
+/* ---- Main content bottom padding (accounts for mobile tab bar) ---- */
+.main-content-pad {
+  padding-bottom: max(80px, calc(64px + env(safe-area-inset-bottom, 0px)));
+}
+@media (min-width: 768px) {
+  .main-content-pad {
+    padding-bottom: 2rem;
+  }
+}
+
 /* ---- PlayerSheet animation ---- */
 @keyframes slideup {
   from { transform: translateY(28px); opacity: 0; }

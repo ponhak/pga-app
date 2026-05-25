@@ -663,7 +663,7 @@ export default function RoundPage() {
                 <a href="/players" style={{ color: 'var(--tour-navy)', fontWeight: 700, textDecoration: 'underline' }}>Add players first.</a>
               </div>
             ) : (
-              <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" style={{ padding: '10px 14px', gap: 8 }}>
                 {allPlayers.map(p => {
                   const on = setupSelected.has(p.id)
                   return (
@@ -752,7 +752,7 @@ export default function RoundPage() {
               </button>
 
               {setupGroups.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" style={{ gap: 8 }}>
                   {setupGroups.map((group, i) => (
                     <div
                       key={i}
@@ -872,7 +872,7 @@ export default function RoundPage() {
       {groups.length > 0 && (
         <section style={{ padding: '16px' }}>
           <div className="eyebrow" style={{ marginBottom: 10 }}>Pairings</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" style={{ gap: 10 }}>
             {groups.map(g => (
               <div
                 key={g.id}
@@ -936,7 +936,7 @@ export default function RoundPage() {
           {isScored ? (
             <>
               {/* Locked column header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 52px 48px 52px 54px', padding: '5px 14px', background: 'var(--bunker-sand)', borderBottom: '1px solid var(--bunker-sand-deep)' }}>
+              <div className="grid grid-cols-[30px_1fr_52px_48px_52px_54px] md:grid-cols-[36px_1fr_80px_72px_80px_80px]" style={{ padding: '5px 14px', background: 'var(--bunker-sand)', borderBottom: '1px solid var(--bunker-sand-deep)' }}>
                 {(['POS', 'PLAYER', 'GROSS', 'NET', '+/−', 'PTS'] as const).map((col, i) => (
                   <span key={col} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: i < 2 ? 'left' : 'center' }}>{col}</span>
                 ))}
@@ -951,7 +951,7 @@ export default function RoundPage() {
                 const netDiff = s.net_diff
                 const diffColor = netDiff == null ? 'var(--ink-faint)' : netDiff < 0 ? 'var(--fairway-green)' : netDiff > 0 ? 'var(--tournament-red)' : 'var(--ink-soft)'
                 return (
-                  <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '30px 1fr 52px 48px 52px 54px', alignItems: 'center', padding: '10px 14px', background: isFirst ? 'rgba(201,162,74,.08)' : isDnf ? 'rgba(200,16,46,.04)' : 'transparent', borderBottom: i < sortedScores.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', opacity: isDnf ? 0.7 : 1 }}>
+                  <div key={s.id} className="grid grid-cols-[30px_1fr_52px_48px_52px_54px] md:grid-cols-[36px_1fr_80px_72px_80px_80px]" style={{ alignItems: 'center', padding: '10px 14px', background: isFirst ? 'rgba(201,162,74,.08)' : isDnf ? 'rgba(200,16,46,.04)' : 'transparent', borderBottom: i < sortedScores.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', opacity: isDnf ? 0.7 : 1 }}>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: isDnf ? 9 : 13, fontWeight: 700, color: isFirst ? 'var(--trophy-gold)' : isDnf ? 'var(--tournament-red)' : 'var(--ink-soft)', letterSpacing: isDnf ? '.04em' : 0 }}>
                       {isDnf ? 'DNF' : s.rank}
                     </span>
@@ -974,7 +974,7 @@ export default function RoundPage() {
           ) : (
             <>
               {/* Editable column header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px', padding: '5px 14px', background: 'var(--bunker-sand)', borderBottom: '1px solid var(--bunker-sand-deep)' }}>
+              <div className="grid grid-cols-[1fr_56px_56px_56px] md:grid-cols-[1fr_80px_80px_80px]" style={{ padding: '5px 14px', background: 'var(--bunker-sand)', borderBottom: '1px solid var(--bunker-sand-deep)' }}>
                 {(['PLAYER', 'GROSS', 'NET', '+/−'] as const).map((lbl, i) => (
                   <span key={lbl} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: i === 0 ? 'left' : 'center' }}>{lbl}</span>
                 ))}
@@ -988,7 +988,7 @@ export default function RoundPage() {
                 const netDiff = netDiffData[p.id] ?? null
                 const diffColor = netDiff == null ? 'var(--ink-faint)' : netDiff > 0 ? 'var(--tournament-red)' : netDiff < 0 ? 'var(--fairway-green)' : 'var(--ink)'
                 return (
-                  <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 56px 56px 56px', alignItems: 'center', padding: '9px 14px', borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}>
+                  <div key={p.id} className="grid grid-cols-[1fr_56px_56px_56px] md:grid-cols-[1fr_80px_80px_80px]" style={{ alignItems: 'center', padding: '9px 14px', borderBottom: i < players.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                       <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={28} />
                       <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>

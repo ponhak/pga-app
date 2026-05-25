@@ -150,7 +150,7 @@ export default function SchedulePage() {
 
   function renderSection(label: string, entries: RoundEntry[]) {
     return (
-      <section style={{ padding: '20px 16px 8px' }}>
+      <section className="md:flex-1 md:min-w-[280px]" style={{ padding: '20px 16px 8px' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 10 }}>
           {label}
         </div>
@@ -353,7 +353,7 @@ export default function SchedulePage() {
           <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>Rounds are added via Seasonal Planning</div>
         </div>
       ) : (
-        <div>
+        <div className="md:flex md:flex-wrap md:items-start md:gap-x-6 md:gap-y-0 md:px-6">
           {upcoming.length > 0 && renderSection('Upcoming', upcoming)}
           {pending.length > 0 && renderSection('Report result', pending)}
           {past.length > 0 && renderSection('Past rounds', past)}

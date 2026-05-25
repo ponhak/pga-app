@@ -215,10 +215,10 @@ export default function HistoryPage() {
             )}
           </div>
 
-          {/* Champion card */}
+          {/* Champion card + standings — side-by-side on large screens */}
           {champion && season && (
-            <>
-              <section style={{ padding: '20px 16px 0' }}>
+            <div className="lg:flex lg:items-start lg:gap-6 lg:px-6 lg:py-6">
+              <section className="lg:w-[360px] lg:flex-shrink-0" style={{ padding: '20px 16px 0' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 10 }}>
                   Champion
                 </div>
@@ -265,7 +265,7 @@ export default function HistoryPage() {
               </section>
 
               {/* Full standings */}
-              <section style={{ background: 'var(--tour-navy)', marginTop: 24 }}>
+              <section className="lg:flex-1 lg:mt-0" style={{ background: 'var(--tour-navy)', marginTop: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--tour-navy-deep)', borderBottom: '1px solid rgba(255,255,255,.06)' }}>
                   <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0' }}>
                     {selectedYear} Standings
@@ -299,7 +299,7 @@ export default function HistoryPage() {
                   )
                 })}
               </section>
-            </>
+            </div>
           )}
         </>
       )}

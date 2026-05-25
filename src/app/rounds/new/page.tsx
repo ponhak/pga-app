@@ -203,7 +203,7 @@ export default function NewRoundPage() {
               <a href="/players" style={{ color: 'var(--tour-navy)', fontWeight: 700, textDecoration: 'underline' }}>Add players first.</a>
             </div>
           ) : (
-            <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" style={{ padding: '10px 14px', gap: 8 }}>
               {players.map((p) => {
                 const on = selected.has(p.id)
                 return (
@@ -293,7 +293,7 @@ export default function NewRoundPage() {
             </button>
 
             {groups.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" style={{ gap: 8 }}>
                 {groups.map((group, i) => (
                   <div
                     key={i}

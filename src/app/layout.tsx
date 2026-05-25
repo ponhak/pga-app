@@ -3,6 +3,7 @@ import { Oswald, DM_Sans, DM_Mono } from 'next/font/google'
 import './globals.css'
 import { NavBar } from '@/components/NavBar'
 import { BottomTabBar } from '@/components/BottomTabBar'
+import { Sidebar } from '@/components/Sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { AuthProvider } from '@/components/AuthProvider'
 
@@ -46,11 +47,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-full flex flex-col bg-background" style={{ fontFamily: 'var(--font-body)' }}>
         <AuthProvider>
-          <NavBar />
-          <main className="flex-1 max-w-2xl mx-auto w-full" style={{ paddingBottom: 'max(80px, calc(64px + env(safe-area-inset-bottom, 0px)))' }}>
-            {children}
-          </main>
-          <BottomTabBar />
+          <Sidebar />
+          <div className="flex flex-col flex-1 md:ml-[220px]">
+            <NavBar />
+            <main className="flex-1 max-w-2xl md:max-w-5xl mx-auto w-full main-content-pad">
+              {children}
+            </main>
+            <BottomTabBar />
+          </div>
           <Toaster />
         </AuthProvider>
       </body>

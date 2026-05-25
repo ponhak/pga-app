@@ -25,6 +25,7 @@ export function BottomTabBar() {
 
   return (
     <nav
+      className="grid md:hidden"
       style={{
         position: 'fixed',
         bottom: 0,
@@ -36,7 +37,6 @@ export function BottomTabBar() {
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
         borderTop: '1px solid rgba(255,255,255,.10)',
-        display: 'grid',
         gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
         alignItems: 'start',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
