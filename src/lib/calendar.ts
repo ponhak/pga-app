@@ -5,7 +5,7 @@ export function generateICS(round: {
   date: string
   tee_time: string | null
   notes: string | null
-}): string {
+}, isUpdate = false): string {
   const [year, month, day] = round.date.split('-').map(Number)
   const [hour, minute] = (round.tee_time ?? '08:00').split(':').map(Number)
 
@@ -17,9 +17,12 @@ export function generateICS(round: {
     duration: { hours: 4 },
     status: 'CONFIRMED',
     busyStatus: 'BUSY',
+    sequence: isUpdate ? 1 : 0,
     organizer: { name: 'PGA Schager', email: 'onboarding@resend.dev' },
   })
 
   if (error || !value) throw new Error(`Failed to generate ICS: ${error}`)
-  return value
+
+  // Inject METHOD:REQUEST so calendar apps treat this as add/update
+  return value.replace('BEGIN:VCALENDAR', 'BEGIN:VCALENDAR\r\nMETHOD:REQUEST')
 }

@@ -6,7 +6,7 @@ import { generateICS } from '@/lib/calendar'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(req: NextRequest) {
-  const { roundId } = await req.json()
+  const { roundId, isUpdate = false } = await req.json()
   if (!roundId) return NextResponse.json({ error: 'Missing roundId' }, { status: 400 })
 
   // Fetch round details
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   // Generate .ics
   let icsContent: string
   try {
-    icsContent = generateICS(round)
+    icsContent = generateICS(round, isUpdate)
   } catch {
     return NextResponse.json({ error: 'Failed to generate calendar file' }, { status: 500 })
   }
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       resend.emails.send({
         from: 'PGA Schager <onboarding@resend.dev>',
         to: email,
-        subject: `New round scheduled — ${dateLabel}`,
+        subject: `${isUpdate ? 'Round updated' : 'New round scheduled'} — ${dateLabel}`,
         html: `
           <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
             <h2 style="color:#0A2240;margin-bottom:4px">PGA Schager</h2>

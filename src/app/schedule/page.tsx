@@ -139,7 +139,7 @@ export default function SchedulePage() {
         fetch('/api/send-calendar-invite', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roundId: editingId }),
+          body: JSON.stringify({ roundId: editingId, isUpdate: true }),
         }).catch(() => {})
       }
       setEditingId(null)
