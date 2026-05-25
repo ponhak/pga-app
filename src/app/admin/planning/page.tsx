@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/AuthProvider'
 import { toast } from 'sonner'
-import { ShieldCheck, ChevronLeft, Zap, Save, RefreshCw, X } from 'lucide-react'
+import { ShieldCheck, ChevronLeft, Zap, Save, CalendarCheck, X, MapPin, CalendarDays } from 'lucide-react'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
 const THIS_YEAR = new Date().getFullYear()
@@ -22,6 +22,11 @@ interface PlanRound {
 
 const MONTH_NAMES_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAY_LABELS_SHORT = ['Mo','Tu','We','Th','Fr','Sa','Su']
+
+function formatDateDisplay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 function AvailabilityDatePicker({ value, onChange, blockMap, blockDetails }: {
   value: string
@@ -71,7 +76,10 @@ function AvailabilityDatePicker({ value, onChange, blockMap, blockDetails }: {
           color: value ? 'var(--ink)' : 'rgba(0,0,0,.35)',
         }}
       >
-        <span>{value || 'yyyy-mm-dd'}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <CalendarDays size={13} strokeWidth={2} style={{ flexShrink: 0, color: value ? 'var(--ink-soft)' : 'rgba(0,0,0,.3)' }} />
+          {value ? formatDateDisplay(value) : 'Select date'}
+        </span>
         {cnt > 0 && (
           <span style={{
             minWidth: 18, height: 18, borderRadius: 9, flexShrink: 0,
@@ -84,7 +92,7 @@ function AvailabilityDatePicker({ value, onChange, blockMap, blockDetails }: {
 
       {open && (
         <div style={{
-          position: 'absolute', top: 42, right: 0, zIndex: 50,
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 50,
           background: '#fff', border: '1px solid var(--bunker-sand-deep)',
           borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.18)',
           padding: '16px', width: 276,
@@ -577,42 +585,68 @@ export default function PlanningPage() {
               Round Schedule
             </div>
             <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
-              {/* Column headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px 32px', gap: 8, padding: '8px 14px', borderBottom: '1px solid var(--bunker-sand-deep)', background: 'var(--bunker-sand)' }}>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px' }}>#</span>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px' }}>Name</span>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px' }}>Date</span>
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', lineHeight: '36px', textAlign: 'center' }}>2×</span>
-                <span />
-              </div>
-
               {planRounds.map((r, i) => (
                 <div
                   key={i}
-                  style={{ display: 'grid', gridTemplateColumns: '28px 1fr 130px 44px 32px', gap: 8, padding: '10px 14px', alignItems: 'center', borderBottom: i < planRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', background: r.double_points ? 'rgba(201,162,74,.07)' : 'transparent', transition: 'background .15s' }}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '26px 1fr 44px',
+                    gridTemplateRows: 'auto auto',
+                    columnGap: 8,
+                    rowGap: 6,
+                    alignItems: 'center',
+                    padding: '10px 14px',
+                    borderBottom: i < planRounds.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none',
+                    background: r.double_points ? 'rgba(201,162,74,.07)' : 'transparent',
+                    transition: 'background .15s',
+                  }}
                 >
-                  <span style={{ fontSize: 12, fontWeight: 700, color: r.linked_round_id ? 'var(--fairway-green)' : 'var(--ink-faint)', textAlign: 'center' }}>
+                  {/* # badge — spans both rows */}
+                  <span style={{ gridRow: '1 / 3', fontSize: 12, fontWeight: 700, color: r.linked_round_id ? 'var(--fairway-green)' : 'var(--ink-faint)', textAlign: 'center' }}>
                     {r.round_number}
                   </span>
-                  <input
-                    type="text"
-                    placeholder={`Round ${r.round_number}`}
-                    value={r.name}
-                    onChange={e => updateRound(i, { name: e.target.value })}
-                    style={{ ...inputStyle(), width: '100%' }}
-                  />
-                  <AvailabilityDatePicker
-                    value={r.date}
-                    onChange={date => updateRound(i, { date })}
-                    blockMap={blockMap}
-                    blockDetails={blockDetails}
-                  />
+                  {/* Name input with MapPin icon */}
+                  <div style={{ position: 'relative', gridColumn: 2, gridRow: 1 }}>
+                    <MapPin size={13} strokeWidth={2} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-faint)', pointerEvents: 'none' }} />
+                    <input
+                      type="text"
+                      placeholder={`Round ${r.round_number}`}
+                      value={r.name}
+                      onChange={e => updateRound(i, { name: e.target.value })}
+                      style={{ ...inputStyle(), width: '100%', paddingLeft: 30, boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  {/* Delete */}
+                  <button
+                    type="button"
+                    onClick={() => removeRound(i)}
+                    title="Remove this round"
+                    style={{
+                      gridColumn: 3, gridRow: 1,
+                      width: 44, height: 36, borderRadius: 7, border: '1.5px solid var(--bunker-sand-deep)',
+                      background: 'transparent', color: 'var(--tournament-red)',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <X size={13} strokeWidth={2.5} />
+                  </button>
+                  {/* Date picker */}
+                  <div style={{ gridColumn: 2, gridRow: 2 }}>
+                    <AvailabilityDatePicker
+                      value={r.date}
+                      onChange={date => updateRound(i, { date })}
+                      blockMap={blockMap}
+                      blockDetails={blockDetails}
+                    />
+                  </div>
+                  {/* 2× toggle */}
                   <button
                     type="button"
                     onClick={() => updateRound(i, { double_points: !r.double_points })}
                     title={r.double_points ? 'Double points ON — click to disable' : 'Click to enable double points'}
                     style={{
-                      height: 36, borderRadius: 7, border: '2px solid',
+                      gridColumn: 3, gridRow: 2,
+                      height: 36, width: 44, borderRadius: 7, border: '2px solid',
                       borderColor: r.double_points ? 'var(--trophy-gold)' : 'var(--bunker-sand-deep)',
                       background: r.double_points ? 'var(--trophy-gold)' : 'transparent',
                       color: r.double_points ? 'var(--tour-navy)' : 'var(--ink-faint)',
@@ -620,20 +654,8 @@ export default function PlanningPage() {
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2,
                     }}
                   >
-                    {r.double_points && <Zap size={10} strokeWidth={3} />}
+                    <Zap size={10} strokeWidth={3} />
                     2×
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeRound(i)}
-                    title="Remove this round"
-                    style={{
-                      width: 32, height: 36, borderRadius: 7, border: '1.5px solid var(--bunker-sand-deep)',
-                      background: 'transparent', color: 'var(--tournament-red)',
-                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    <X size={13} strokeWidth={2.5} />
                   </button>
                 </div>
               ))}
@@ -641,33 +663,34 @@ export default function PlanningPage() {
           </div>
 
           {/* Actions */}
-          <div style={{ padding: '20px 16px 0', display: 'flex', gap: 10 }}>
+          <div style={{ padding: '20px 16px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button
               onClick={saveDraft}
               disabled={saving || syncing}
               style={{
-                flex: 1, height: 44, borderRadius: 8, border: 0,
+                width: '100%', height: 48, borderRadius: 10, border: 0,
                 cursor: saving || syncing ? 'not-allowed' : 'pointer',
                 background: saving || syncing ? '#ccc' : 'var(--tour-navy)',
-                color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: '.06em', textTransform: 'uppercase',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >
-              <Save size={15} strokeWidth={2.5} />
+              <Save size={16} strokeWidth={2.5} />
               {saving ? 'Saving…' : 'Save Draft'}
             </button>
             <button
               onClick={syncSchedule}
               disabled={saving || syncing}
               style={{
-                flex: 1, height: 44, borderRadius: 8, border: 0,
+                width: '100%', height: 48, borderRadius: 10, border: 0,
                 cursor: saving || syncing ? 'not-allowed' : 'pointer',
-                background: saving || syncing ? '#ccc' : 'var(--tournament-red)',
-                color: '#fff', fontWeight: 700, fontSize: 13, letterSpacing: '.06em', textTransform: 'uppercase',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                background: saving || syncing ? '#ccc' : 'linear-gradient(135deg, #e8102a 0%, #b00c20 100%)',
+                color: '#fff', fontWeight: 700, fontSize: 14, letterSpacing: '.06em', textTransform: 'uppercase',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                boxShadow: saving || syncing ? 'none' : '0 2px 10px rgba(200,16,46,.40)',
               }}
             >
-              <RefreshCw size={15} strokeWidth={2.5} />
+              <CalendarCheck size={16} strokeWidth={2.5} />
               {syncing ? 'Syncing…' : 'Sync to Schedule'}
             </button>
           </div>
