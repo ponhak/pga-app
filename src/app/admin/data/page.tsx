@@ -28,8 +28,9 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
   const skipRe        = /slagspel|poangbogey|resultat|spelat|leaderboard|spelinfo|spelflode|johannesberg|donald|steel|\bbook\b|\bgame\b/i
   const standaloneHcpRe = /^HCP\s*(\d+)$/i
   const nameOnlyRe    = /^[A-Za-zÅÄÖåäöÉéÜü\s\-]{3,}$/
-  const scoreReHcp    = /HCP\s*(\d+)\s*[^\d\s]?\s*(\d{1,3})\s+([+\-]?\d+)/i
-  const scoreReNoHcp  = /(\d{2,3})\s+([+\-]?\d+)/i
+  const scoreReHcp    = /HCP\s*(\d+)\s*[^\d\s]?\s*(\d{1,3})\s+([+\-]?\d+|[Ee])/i
+  const scoreReNoHcp  = /(\d{2,3})\s+([+\-]?\d+|[Ee])/i
+  const parseNetDiff  = (s: string) => /^[Ee]$/.test(s) ? 0 : Number(s)
 
   interface NameEntry  { idx: number; text: string; claimed: boolean }
   interface HcpEntry   { idx: number; val: number;  claimed: boolean }
@@ -45,9 +46,9 @@ function parseGolfGameBook(ocrText: string): { name: string; strokes: number; hc
     const hcpOnly = line.match(standaloneHcpRe)
     if (hcpOnly) { hcpEntries.push({ idx: i, val: Number(hcpOnly[1]), claimed: false }); continue }
     const mHcp = line.match(scoreReHcp)
-    if (mHcp) { scoreEntries.push({ idx: i, hcp: Number(mHcp[1]), strokes: Number(mHcp[2]), netDiff: Number(mHcp[3]), line }); continue }
+    if (mHcp) { scoreEntries.push({ idx: i, hcp: Number(mHcp[1]), strokes: Number(mHcp[2]), netDiff: parseNetDiff(mHcp[3]), line }); continue }
     const mNoHcp = line.match(scoreReNoHcp)
-    if (mNoHcp) { scoreEntries.push({ idx: i, hcp: null, strokes: Number(mNoHcp[1]), netDiff: Number(mNoHcp[2]), line }); continue }
+    if (mNoHcp) { scoreEntries.push({ idx: i, hcp: null, strokes: Number(mNoHcp[1]), netDiff: parseNetDiff(mNoHcp[2]), line }); continue }
     if (nameOnlyRe.test(line)) nameEntries.push({ idx: i, text: line, claimed: false })
   }
 
@@ -535,12 +536,11 @@ export default function ManageDataPage() {
       const net: Record<string, string> = {}
       const nd: Record<string, string>  = {}
       const gs: Record<string, string>  = {}
-      const unmatched: string[] = []
       let count = 0
 
       for (const { name, strokes, hcp, netDiff } of extracted) {
         const pName = matchOcrName(name, pNames, nicknames)
-        if (!pName) { unmatched.push(`${name}(${strokes})`); continue }
+        if (!pName) continue
         const player = playerList.find(p => p.name === pName)
         if (player && !net[player.id]) {
           net[player.id] = String(strokes)
@@ -558,8 +558,7 @@ export default function ManageDataPage() {
         setNd(prev => ({ ...prev, ...nd }))
         setGs(prev => ({ ...prev, ...gs }))
         const summary = extracted.map(e => `${e.name}=${e.strokes}`).join(' | ')
-        const detail = unmatched.length ? ` | Unmatched: ${unmatched.join(', ')}` : ''
-        toast.success(`Filled ${count}/${playerList.length} | ${summary}${detail}`, { duration: 12000 })
+        toast.success(`Filled ${count}/${playerList.length} | ${summary}`, { duration: 12000 })
       }
     } catch (err) {
       toast.error('Scan failed: ' + (err instanceof Error ? err.message : String(err)))
