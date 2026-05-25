@@ -24,6 +24,15 @@ async function resolveAdmin(s: Session | null): Promise<boolean> {
   return data?.is_admin === true
 }
 
+async function touchProfile(s: Session | null) {
+  if (!s?.user) return
+  await supabase.from('profiles').upsert({
+    id: s.user.id,
+    email: s.user.email,
+    last_seen_at: new Date().toISOString(),
+  }, { onConflict: 'id' })
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
@@ -33,11 +42,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session)
       setIsAdmin(await resolveAdmin(data.session))
+      touchProfile(data.session)
       setLoading(false)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, s) => {
       setSession(s)
       setIsAdmin(await resolveAdmin(s))
+      touchProfile(s)
     })
     return () => subscription.unsubscribe()
   }, [])

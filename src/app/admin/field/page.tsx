@@ -18,6 +18,7 @@ const db = supabase as any
 interface MemberInfo {
   email: string
   is_admin: boolean
+  last_seen_at: string | null
 }
 
 function Toggle({ on, disabled, onChange }: { on: boolean; disabled: boolean; onChange: () => void }) {
@@ -27,7 +28,7 @@ function Toggle({ on, disabled, onChange }: { on: boolean; disabled: boolean; on
       disabled={disabled}
       aria-label={on ? 'Revoke admin' : 'Grant admin'}
       style={{
-        width: 44, height: 26, borderRadius: 999, border: 0,
+        width: 40, height: 22, borderRadius: 999, border: 0,
         background: on ? 'var(--fairway-green)' : 'var(--bunker-sand-deep)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.4 : 1,
@@ -36,13 +37,26 @@ function Toggle({ on, disabled, onChange }: { on: boolean; disabled: boolean; on
       }}
     >
       <span style={{
-        position: 'absolute', top: 3, left: on ? 21 : 3,
-        width: 20, height: 20, borderRadius: '50%',
+        position: 'absolute', top: 2, left: on ? 19 : 2,
+        width: 18, height: 18, borderRadius: '50%',
         background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
         transition: 'left .18s', display: 'block',
       }} />
     </button>
   )
+}
+
+function formatLastSeen(iso: string | null): string {
+  if (!iso) return 'Never'
+  const d = new Date(iso)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffDays = Math.floor(diffMs / 86400000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: diffDays > 365 ? 'numeric' : undefined })
 }
 
 export default function FieldPage() {
@@ -62,9 +76,8 @@ export default function FieldPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
 
-  // name (lowercase) → { email, is_admin }
-  const [memberByName, setMemberByName] = useState<Record<string, MemberInfo>>({})
-  const [unmatchedMembers, setUnmatchedMembers] = useState<MemberInfo[]>([])
+  const [memberByEmail, setMemberByEmail] = useState<Record<string, MemberInfo>>({})
+  const [emailByPlayerName, setEmailByPlayerName] = useState<Record<string, string>>({})
   const [toggling, setToggling] = useState<string | null>(null)
 
   useEffect(() => {
@@ -89,43 +102,30 @@ export default function FieldPage() {
   }
 
   async function loadMemberMap() {
-    const [{ data: profiles }, { data: emailData }, { data: blocks }] = await Promise.all([
-      db.from('profiles').select('id, name'),
-      db.from('allowed_emails').select('email, is_admin, user_id'),
-      db.from('availability_blocks').select('user_id, user_email'),
+    const [{ data: profiles }, { data: emailData }] = await Promise.all([
+      db.from('profiles').select('id, name, email, last_seen_at'),
+      db.from('allowed_emails').select('email, is_admin'),
     ])
 
-    const emailList = (emailData ?? []) as { email: string; is_admin: boolean; user_id?: string | null }[]
-
-    // Build user_id → MemberInfo
-    // Method 1: direct user_id column on allowed_emails (if it exists)
-    const infoByUserId: Record<string, MemberInfo> = {}
-    for (const e of emailList) {
-      if (e.user_id) infoByUserId[e.user_id] = { email: e.email, is_admin: e.is_admin }
-    }
-
-    // Method 2: bridge via availability_blocks (user_id ↔ user_email)
+    // email → { is_admin }
     const adminByEmail: Record<string, boolean> = {}
-    for (const e of emailList) adminByEmail[e.email] = e.is_admin
-    for (const b of (blocks ?? [])) {
-      if (!infoByUserId[b.user_id] && adminByEmail[b.user_email] !== undefined) {
-        infoByUserId[b.user_id] = { email: b.user_email, is_admin: adminByEmail[b.user_email] }
-      }
-    }
+    for (const e of (emailData ?? [])) adminByEmail[e.email] = e.is_admin
 
-    // Match profiles to player names
-    const map: Record<string, MemberInfo> = {}
-    const matchedEmails = new Set<string>()
+    // Build memberByEmail and emailByPlayerName
+    const byEmail: Record<string, MemberInfo> = {}
+    const byName: Record<string, string> = {}
     for (const p of (profiles ?? [])) {
-      const info = infoByUserId[p.id]
-      if (info && p.name) {
-        map[p.name.toLowerCase()] = info
-        matchedEmails.add(info.email)
+      if (!p.email) continue
+      byEmail[p.email] = {
+        email: p.email,
+        is_admin: adminByEmail[p.email] ?? false,
+        last_seen_at: p.last_seen_at ?? null,
       }
+      if (p.name) byName[p.name.toLowerCase()] = p.email
     }
 
-    setMemberByName(map)
-    setUnmatchedMembers(emailList.filter(e => !matchedEmails.has(e.email)))
+    setMemberByEmail(byEmail)
+    setEmailByPlayerName(byName)
   }
 
   async function addPlayer(e: React.FormEvent) {
@@ -206,7 +206,7 @@ export default function FieldPage() {
       .select('email', { count: 'exact', head: true })
     if (error) { toast.error(error.message) }
     else if (count === 0) { toast.error('Permission denied — check Supabase RLS policies') }
-    else { toast.success(`${email} is ${!current ? 'now an admin' : 'no longer an admin'}`); await loadMemberMap(); }
+    else { toast.success(`${email} is ${!current ? 'now an admin' : 'no longer an admin'}`); await loadMemberMap() }
     setToggling(null)
   }
 
@@ -234,12 +234,8 @@ export default function FieldPage() {
         >
           <ChevronLeft size={14} strokeWidth={2.5} /> Admin
         </button>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--trophy-gold)', marginBottom: 4 }}>
-          Admin
-        </div>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 28, textTransform: 'uppercase', letterSpacing: '.02em', color: '#fff', lineHeight: 1 }}>
-          Field & Roles
-        </div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--trophy-gold)', marginBottom: 4 }}>Admin</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 28, textTransform: 'uppercase', letterSpacing: '.02em', color: '#fff', lineHeight: 1 }}>Field & Roles</div>
       </div>
 
       {/* Search + add */}
@@ -247,21 +243,13 @@ export default function FieldPage() {
         <div style={{ position: 'relative', flex: 1 }}>
           <Search size={18} strokeWidth={2} color="var(--ink-faint)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search the field"
-            style={{
-              width: '100%', height: 44, paddingLeft: 40, paddingRight: 12,
-              borderRadius: 8, border: '1px solid var(--bunker-sand-deep)',
-              background: '#fff', color: 'var(--ink)',
-              fontFamily: 'var(--font-body)', fontSize: 15, boxSizing: 'border-box', outline: 'none',
-            }}
+            value={query} onChange={e => setQuery(e.target.value)} placeholder="Search the field"
+            style={{ width: '100%', height: 44, paddingLeft: 40, paddingRight: 12, borderRadius: 8, border: '1px solid var(--bunker-sand-deep)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-body)', fontSize: 15, boxSizing: 'border-box', outline: 'none' }}
           />
         </div>
         <button
           onClick={() => setShowAdd(v => !v)}
           style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0, background: showAdd ? 'var(--tour-navy-soft)' : 'var(--tour-navy)', border: 0, color: '#F5EFE0', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          aria-label={showAdd ? 'Cancel' : 'Add player'}
         >
           {showAdd ? <X size={18} strokeWidth={2} /> : <Plus size={18} strokeWidth={2} />}
         </button>
@@ -270,8 +258,7 @@ export default function FieldPage() {
       {showAdd && (
         <form onSubmit={addPlayer} style={{ padding: '0 16px 12px', display: 'flex', gap: 10 }}>
           <input
-            value={newName} onChange={e => setNewName(e.target.value)}
-            placeholder="Player name" maxLength={50} autoFocus
+            value={newName} onChange={e => setNewName(e.target.value)} placeholder="Player name" maxLength={50} autoFocus
             style={{ flex: 1, height: 44, padding: '0 14px', borderRadius: 8, border: '1.5px solid var(--tour-navy)', background: '#fff', color: 'var(--ink)', fontFamily: 'var(--font-body)', fontSize: 15, outline: 'none', boxSizing: 'border-box' }}
           />
           <button
@@ -285,6 +272,7 @@ export default function FieldPage() {
 
       <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarFile} />
 
+      {/* Player list */}
       <div style={{ padding: '0 16px 40px' }}>
         {loadingPlayers ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--ink-faint)', fontSize: 14 }}>Loading…</div>
@@ -293,129 +281,125 @@ export default function FieldPage() {
             {players.length === 0 ? 'No players yet. Tap + to add your first player.' : 'No players match your search.'}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4" style={{ gap: 10 }}>
-            {filtered.map(p => {
+          <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
+            {filtered.map((p, idx) => {
               const isUploading = uploadingFor === p.id
-              const member = memberByName[p.name.toLowerCase()]
+              const email = emailByPlayerName[p.name.toLowerCase()]
+              const member = email ? memberByEmail[email] : undefined
+              const hasAccount = !!member
               const isSuperAdmin = member?.email === ADMIN_EMAIL
+              const isActive = hasAccount
               return (
-                <div key={p.id} style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div key={p.id} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', padding: '16px' }}>
+                  <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
 
-                  {/* Avatar */}
-                  <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', padding: '16px 16px 10px' }}>
-                    <div onClick={() => triggerAvatarUpload(p.id)} style={{ position: 'relative', cursor: 'pointer' }}>
-                      <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={72} />
-                      <div style={{ position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderRadius: '50%', background: isUploading ? 'var(--ink-faint)' : 'var(--tour-navy)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Camera size={11} color="#fff" strokeWidth={2} />
+                    {/* Avatar */}
+                    <div onClick={() => triggerAvatarUpload(p.id)} style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
+                      <PlayerAvatar name={p.name} avatarUrl={p.avatar_url} size={52} />
+                      <div style={{ position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: isUploading ? 'var(--ink-faint)' : 'var(--tour-navy)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Camera size={9} color="#fff" strokeWidth={2} />
                       </div>
                     </div>
-                    <button
-                      onClick={() => deletePlayer(p)}
-                      style={{ position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 6, background: 'transparent', border: '1px solid var(--bunker-sand-deep)', color: 'var(--ink-faint)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                      aria-label={`Remove ${p.name}`}
-                    >
-                      <X size={13} strokeWidth={2} />
-                    </button>
-                  </div>
 
-                  {/* Name */}
-                  <div style={{ textAlign: 'center', padding: '0 12px', minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                  </div>
+                    {/* Main info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
 
-                  {/* Account row (if member has account) */}
-                  {member && (
-                    <div style={{ margin: '8px 12px 0', padding: '8px 10px', borderRadius: 8, background: member.is_admin ? 'rgba(31,122,76,.07)' : 'var(--bunker-sand)', border: `1px solid ${member.is_admin ? 'rgba(31,122,76,.18)' : 'var(--bunker-sand-deep)'}` }}>
-                      <div style={{ fontSize: 10, color: 'var(--ink-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 6 }}>
-                        {member.email}
+                      {/* Name row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 2 }}>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{p.name}</span>
+                        {hasAccount ? (
+                          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 999, background: 'rgba(31,122,76,.12)', color: 'var(--fairway-green)' }}>
+                            Active
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 999, background: 'rgba(0,0,0,.06)', color: 'var(--ink-faint)' }}>
+                            No account
+                          </span>
+                        )}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: member.is_admin ? 'var(--fairway-green)' : 'var(--ink-faint)' }}>
-                          {isSuperAdmin ? 'Super admin' : member.is_admin ? 'Admin' : 'Member'}
-                        </span>
-                        <Toggle
-                          on={member.is_admin}
-                          disabled={isSuperAdmin || toggling === member.email}
-                          onChange={() => toggleAdmin(member.email, member.is_admin)}
-                        />
-                      </div>
-                    </div>
-                  )}
 
-                  {/* HCP + Aliases */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 12px 12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>HCP</span>
-                      <input
-                        type="number" min={0} max={54} step={0.1}
-                        value={hcpEdits[p.id] ?? ''}
-                        onChange={e => setHcpEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
-                        onBlur={() => saveHcp(p.id)}
-                        placeholder="—" disabled={savingHcp === p.id}
-                        style={{ width: 54, height: 28, textAlign: 'center', borderRadius: 6, border: '1px solid var(--bunker-sand-deep)', background: hcpEdits[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)', color: hcpEdits[p.id] ? '#F5EFE0' : 'var(--ink)', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)', textAlign: 'center' }}>OCR Aliases</span>
-                      {(p.nicknames ?? []).length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
-                          {(p.nicknames ?? []).map(alias => (
-                            <span key={alias} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 5px 3px 8px', borderRadius: 5, background: 'var(--tour-navy)', color: '#F5EFE0', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600 }}>
-                              {alias}
-                              <button onClick={() => removeAlias(p.id, alias)} disabled={savingNicknames === p.id} aria-label={`Remove alias ${alias}`} style={{ width: 14, height: 14, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.22)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
-                                <X size={8} strokeWidth={3} />
-                              </button>
-                            </span>
-                          ))}
+                      {/* Email row */}
+                      {hasAccount && (
+                        <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {member!.email}
                         </div>
                       )}
-                      <input
-                        type="text"
-                        value={nicknameEdits[p.id] ?? ''}
-                        onChange={e => setNicknameEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') addAlias(p.id, nicknameEdits[p.id] ?? '') }}
-                        onBlur={() => { if (nicknameEdits[p.id]?.trim()) addAlias(p.id, nicknameEdits[p.id] ?? '') }}
-                        placeholder="+ add alias" disabled={savingNicknames === p.id}
-                        style={{ width: '100%', height: 26, padding: '0 8px', textAlign: 'center', borderRadius: 6, border: '1px dashed var(--bunker-sand-deep)', background: 'transparent', color: 'var(--ink-soft)', fontFamily: 'var(--font-mono)', fontSize: 10, outline: 'none', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                  </div>
 
+                      {/* Last seen + HCP row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                        {hasAccount && (
+                          <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>
+                            Last seen: <strong>{formatLastSeen(member!.last_seen_at)}</strong>
+                          </span>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>HCP</span>
+                          <input
+                            type="number" min={0} max={54} step={0.1}
+                            value={hcpEdits[p.id] ?? ''}
+                            onChange={e => setHcpEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
+                            onBlur={() => saveHcp(p.id)}
+                            placeholder="—" disabled={savingHcp === p.id}
+                            style={{ width: 48, height: 24, textAlign: 'center', borderRadius: 6, border: '1px solid var(--bunker-sand-deep)', background: hcpEdits[p.id] ? 'var(--tour-navy)' : 'var(--bunker-sand)', color: hcpEdits[p.id] ? '#F5EFE0' : 'var(--ink)', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* OCR Aliases */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>Aliases</span>
+                        {(p.nicknames ?? []).map(alias => (
+                          <span key={alias} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 5px 2px 7px', borderRadius: 5, background: 'var(--tour-navy)', color: '#F5EFE0', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600 }}>
+                            {alias}
+                            <button onClick={() => removeAlias(p.id, alias)} disabled={savingNicknames === p.id} aria-label={`Remove alias ${alias}`} style={{ width: 13, height: 13, borderRadius: '50%', border: 0, background: 'rgba(255,255,255,.22)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+                              <X size={7} strokeWidth={3} />
+                            </button>
+                          </span>
+                        ))}
+                        <input
+                          type="text"
+                          value={nicknameEdits[p.id] ?? ''}
+                          onChange={e => setNicknameEdits(prev => ({ ...prev, [p.id]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') addAlias(p.id, nicknameEdits[p.id] ?? '') }}
+                          onBlur={() => { if (nicknameEdits[p.id]?.trim()) addAlias(p.id, nicknameEdits[p.id] ?? '') }}
+                          placeholder="+ add"
+                          disabled={savingNicknames === p.id}
+                          style={{ height: 22, padding: '0 6px', borderRadius: 5, border: '1px dashed var(--bunker-sand-deep)', background: 'transparent', color: 'var(--ink-soft)', fontFamily: 'var(--font-mono)', fontSize: 10, outline: 'none', width: 56 }}
+                        />
+                      </div>
+
+                    </div>
+
+                    {/* Right: delete + admin toggle */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10, flexShrink: 0 }}>
+                      <button
+                        onClick={() => deletePlayer(p)}
+                        style={{ width: 26, height: 26, borderRadius: 6, background: 'transparent', border: '1px solid var(--bunker-sand-deep)', color: 'var(--ink-faint)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        aria-label={`Remove ${p.name}`}
+                      >
+                        <X size={13} strokeWidth={2} />
+                      </button>
+                      {hasAccount && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: member!.is_admin ? 'var(--fairway-green)' : 'var(--ink-faint)' }}>
+                            {isSuperAdmin ? 'Super admin' : member!.is_admin ? 'Admin' : 'Member'}
+                          </span>
+                          <Toggle
+                            on={member!.is_admin}
+                            disabled={isSuperAdmin || toggling === member!.email}
+                            onChange={() => toggleAdmin(member!.email, member!.is_admin)}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
                 </div>
               )
             })}
           </div>
         )}
       </div>
-
-      {/* Unmatched members — accounts with no linked player card */}
-      {unmatchedMembers.length > 0 && (
-        <div style={{ padding: '0 16px 40px', borderTop: '1px solid var(--bunker-sand-deep)', paddingTop: 20 }}>
-          <div className="eyebrow" style={{ marginBottom: 4 }}>Members without a player card</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 14 }}>
-            These accounts are not linked to any player in the field.
-          </div>
-          <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
-            {unmatchedMembers.map((m, i) => {
-              const isSuperAdmin = m.email === ADMIN_EMAIL
-              return (
-                <div key={m.email} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: i < unmatchedMembers.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', background: m.is_admin ? 'rgba(31,122,76,.04)' : 'transparent' }}>
-                  <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: m.is_admin ? 'var(--fairway-green)' : 'var(--bunker-sand-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <ShieldCheck size={18} strokeWidth={2} color={m.is_admin ? '#fff' : 'var(--ink-faint)'} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.email}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 2 }}>
-                      {isSuperAdmin ? 'Super admin · always on' : m.is_admin ? 'Admin' : 'Member'}
-                    </div>
-                  </div>
-                  <Toggle on={m.is_admin} disabled={isSuperAdmin || toggling === m.email} onChange={() => toggleAdmin(m.email, m.is_admin)} />
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
