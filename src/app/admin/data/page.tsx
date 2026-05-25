@@ -549,6 +549,36 @@ export default function ManageDataPage() {
     setScanning(false)
   }
 
+  // ── Shared status toggle (DNF / DNS two-button) ──────────────────────────
+
+  function StatusButtons({ id, status, setStatus }: {
+    id: string
+    status: Record<string, 'dnf' | 'dns'>
+    setStatus: React.Dispatch<React.SetStateAction<Record<string, 'dnf' | 'dns'>>>
+  }) {
+    const cur = status[id]
+    const toggle = (val: 'dnf' | 'dns') =>
+      setStatus(prev => { const n = { ...prev }; cur === val ? delete n[id] : (n[id] = val); return n })
+    const btn = (val: 'dnf' | 'dns', activeColor: string, activeBg: string) => (
+      <button type="button" onClick={() => toggle(val)} style={{
+        flex: 1, height: 38, borderRadius: 6,
+        border: `1.5px solid ${cur === val ? activeColor : 'var(--bunker-sand-deep)'}`,
+        background: cur === val ? activeBg : 'transparent',
+        color: cur === val ? activeColor : 'var(--ink-faint)',
+        cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {val.toUpperCase()}
+      </button>
+    )
+    return (
+      <div style={{ display: 'flex', gap: 4 }}>
+        {btn('dnf', '#B07800', 'rgba(201,162,74,.12)')}
+        {btn('dns', 'var(--tournament-red)', 'rgba(200,16,46,.08)')}
+      </div>
+    )
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function formatDate(date: string) {
@@ -676,22 +706,17 @@ export default function ManageDataPage() {
                             <input ref={editFileRef} type="file" accept="image/*" style={{ display: 'none' }}
                               onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) runOcr(f, editRoundPlayers, setEditRoundScores, setEditNetDiff, setEditGrossScores, setEditScanning) }} />
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 88px', gap: 8, alignItems: 'center' }}>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
                             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Status</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>DNF / DNS</span>
                           </div>
                           {editRoundPlayers.map(p => {
-                            const st = editStatus[p.id]
-                            const disabled = !!st
-                            const next = st === undefined ? 'dnf' : st === 'dnf' ? 'dns' : undefined
-                            const btnColor = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? '#B07800' : 'var(--ink-faint)'
-                            const btnBg    = st === 'dns' ? 'rgba(200,16,46,.08)' : st === 'dnf' ? 'rgba(201,162,74,.12)' : 'transparent'
-                            const btnBorder = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? 'var(--trophy-gold)' : 'var(--bunker-sand-deep)'
+                            const disabled = !!editStatus[p.id]
                             return (
-                              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
+                              <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 88px', gap: 8, alignItems: 'center' }}>
                                 <span style={{ fontSize: 14, fontWeight: 500, color: disabled ? 'var(--ink-faint)' : 'var(--ink)' }}>{p.name}</span>
                                 <input type="number" min={40} max={130} disabled={disabled}
                                   value={disabled ? '' : (editRoundScores[p.id] ?? '')}
@@ -708,11 +733,7 @@ export default function ManageDataPage() {
                                   onChange={e => setEditGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))}
                                   placeholder="—"
                                   style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
-                                <button type="button"
-                                  onClick={() => setEditStatus(prev => { const n = { ...prev }; next === undefined ? delete n[p.id] : (n[p.id] = next); return n })}
-                                  style={{ width: 48, height: 38, borderRadius: 8, border: `1.5px solid ${btnBorder}`, background: btnBg, color: btnColor, cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  {st ? st.toUpperCase() : '—'}
-                                </button>
+                                <StatusButtons id={p.id} status={editStatus} setStatus={setEditStatus} />
                               </div>
                             )
                           })}
@@ -803,22 +824,17 @@ export default function ManageDataPage() {
                       onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) runOcr(f, players, setHistScores, setHistNetDiff, setHistGrossScores, setHistScanning) }} />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 88px', gap: 8 }}>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
                       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
-                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Status</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>DNF / DNS</span>
                     </div>
                     {players.map(p => {
-                      const st = histStatus[p.id]
-                      const disabled = !!st
-                      const next = st === undefined ? 'dnf' : st === 'dnf' ? 'dns' : undefined
-                      const btnColor = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? '#B07800' : 'var(--ink-faint)'
-                      const btnBg    = st === 'dns' ? 'rgba(200,16,46,.08)' : st === 'dnf' ? 'rgba(201,162,74,.12)' : 'transparent'
-                      const btnBorder = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? 'var(--trophy-gold)' : 'var(--bunker-sand-deep)'
+                      const disabled = !!histStatus[p.id]
                       return (
-                        <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
+                        <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 88px', gap: 8, alignItems: 'center' }}>
                           <span style={{ fontSize: 14, fontWeight: 500, color: disabled ? 'var(--ink-faint)' : 'var(--ink)' }}>{p.name}</span>
                           <input type="number" min={40} max={130} disabled={disabled}
                             value={disabled ? '' : (histScores[p.id] ?? '')}
@@ -835,11 +851,7 @@ export default function ManageDataPage() {
                             onChange={e => setHistGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))}
                             placeholder="—"
                             style={{ width: '100%', height: 40, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
-                          <button type="button"
-                            onClick={() => setHistStatus(prev => { const n = { ...prev }; next === undefined ? delete n[p.id] : (n[p.id] = next); return n })}
-                            style={{ width: 48, height: 40, borderRadius: 8, border: `1.5px solid ${btnBorder}`, background: btnBg, color: btnColor, cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {st ? st.toUpperCase() : '—'}
-                          </button>
+                          <StatusButtons id={p.id} status={histStatus} setStatus={setHistStatus} />
                         </div>
                       )
                     })}
@@ -899,31 +911,22 @@ export default function ManageDataPage() {
                                     {editScanning ? 'Scanning…' : 'Scan'}
                                   </button>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 88px', gap: 8, alignItems: 'center' }}>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>Player</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Net</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>+/−</span>
                                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Gross</span>
-                                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>Status</span>
+                                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'var(--ink-soft)', textAlign: 'center' }}>DNF / DNS</span>
                                 </div>
                                 {editRoundPlayers.map(p => {
-                                  const st = editStatus[p.id]
-                                  const disabled = !!st
-                                  const next = st === undefined ? 'dnf' : st === 'dnf' ? 'dns' : undefined
-                                  const btnColor = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? '#B07800' : 'var(--ink-faint)'
-                                  const btnBg    = st === 'dns' ? 'rgba(200,16,46,.08)' : st === 'dnf' ? 'rgba(201,162,74,.12)' : 'transparent'
-                                  const btnBorder = st === 'dns' ? 'var(--tournament-red)' : st === 'dnf' ? 'var(--trophy-gold)' : 'var(--bunker-sand-deep)'
+                                  const disabled = !!editStatus[p.id]
                                   return (
-                                    <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 48px', gap: 8, alignItems: 'center' }}>
+                                    <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 64px 64px 64px 88px', gap: 8, alignItems: 'center' }}>
                                       <span style={{ fontSize: 14, fontWeight: 500, color: disabled ? 'var(--ink-faint)' : 'var(--ink)' }}>{p.name}</span>
                                       <input type="number" min={40} max={130} disabled={disabled} value={disabled ? '' : (editRoundScores[p.id] ?? '')} onChange={e => setEditRoundScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
                                       <input type="number" min={-50} max={50} disabled={disabled} value={disabled ? '' : (editNetDiff[p.id] ?? '')} onChange={e => setEditNetDiff(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
                                       <input type="number" min={40} max={200} disabled={disabled} value={disabled ? '' : (editGrossScores[p.id] ?? '')} onChange={e => setEditGrossScores(prev => ({ ...prev, [p.id]: e.target.value }))} placeholder="—" style={{ width: '100%', height: 38, padding: '0 8px', borderRadius: 8, border: '1.5px solid var(--bunker-sand-deep)', background: disabled ? 'var(--bunker-sand)' : '#fff', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 14, outline: 'none', textAlign: 'right', boxSizing: 'border-box', opacity: disabled ? 0.4 : 1 }} />
-                                      <button type="button"
-                                        onClick={() => setEditStatus(prev => { const n = { ...prev }; next === undefined ? delete n[p.id] : (n[p.id] = next); return n })}
-                                        style={{ width: 48, height: 38, borderRadius: 8, border: `1.5px solid ${btnBorder}`, background: btnBg, color: btnColor, cursor: 'pointer', fontWeight: 700, fontSize: 10, letterSpacing: '.06em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        {st ? st.toUpperCase() : '—'}
-                                      </button>
+                                      <StatusButtons id={p.id} status={editStatus} setStatus={setEditStatus} />
                                     </div>
                                   )
                                 })}
