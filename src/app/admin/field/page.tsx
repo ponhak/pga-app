@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Player } from '@/lib/database.types'
 import { toast } from 'sonner'
-import { Camera, Search, X, Plus, ChevronLeft, ShieldCheck } from 'lucide-react'
+import { Camera, Search, X, Plus, ChevronLeft, ShieldCheck, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { PlayerAvatar } from '@/components/PlayerAvatar'
 import { ADMIN_EMAIL } from '@/lib/auth'
@@ -49,9 +49,7 @@ function Toggle({ on, disabled, onChange }: { on: boolean; disabled: boolean; on
 function formatLastSeen(iso: string | null): string {
   if (!iso) return 'Never'
   const d = new Date(iso)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffDays = Math.floor(diffMs / 86400000)
+  const diffDays = Math.floor((Date.now() - d.getTime()) / 86400000)
   if (diffDays === 0) return 'Today'
   if (diffDays === 1) return 'Yesterday'
   if (diffDays < 7) return `${diffDays}d ago`
@@ -64,8 +62,10 @@ export default function FieldPage() {
   const router = useRouter()
 
   const [players, setPlayers] = useState<Player[]>([])
+  const [allEmails, setAllEmails] = useState<string[]>([])
+  const [memberByEmail, setMemberByEmail] = useState<Record<string, MemberInfo>>({})
   const [newName, setNewName] = useState('')
-  const [loadingPlayers, setLoadingPlayers] = useState(true)
+  const [loadingData, setLoadingData] = useState(true)
   const [adding, setAdding] = useState(false)
   const [query, setQuery] = useState('')
   const [showAdd, setShowAdd] = useState(false)
@@ -73,22 +73,25 @@ export default function FieldPage() {
   const [savingHcp, setSavingHcp] = useState<string | null>(null)
   const [nicknameEdits, setNicknameEdits] = useState<Record<string, string>>({})
   const [savingNicknames, setSavingNicknames] = useState<string | null>(null)
+  const [savingEmail, setSavingEmail] = useState<string | null>(null)
+  const [emailDropdownOpen, setEmailDropdownOpen] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
-
-  const [memberByEmail, setMemberByEmail] = useState<Record<string, MemberInfo>>({})
-  const [emailByPlayerName, setEmailByPlayerName] = useState<Record<string, string>>({})
   const [toggling, setToggling] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isAdmin) { loadPlayers(); loadMemberMap() }
+    if (isAdmin) loadAll()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 
-  async function loadPlayers() {
-    const { data, error } = await db.from('players').select('*').order('name')
-    if (error) { toast.error('Failed to load players'); return }
-    const list = (data as Player[]) ?? []
+  async function loadAll() {
+    const [{ data: playersData }, { data: emailData }, { data: profilesData }] = await Promise.all([
+      db.from('players').select('*').order('name'),
+      db.from('allowed_emails').select('email, is_admin'),
+      db.from('profiles').select('email, last_seen_at'),
+    ])
+
+    const list = (playersData as Player[]) ?? []
     setPlayers(list)
     const hcpMap: Record<string, string> = {}
     const nickMap: Record<string, string> = {}
@@ -98,34 +101,22 @@ export default function FieldPage() {
     })
     setHcpEdits(hcpMap)
     setNicknameEdits(nickMap)
-    setLoadingPlayers(false)
-  }
 
-  async function loadMemberMap() {
-    const [{ data: profiles }, { data: emailData }] = await Promise.all([
-      db.from('profiles').select('id, name, email, last_seen_at'),
-      db.from('allowed_emails').select('email, is_admin'),
-    ])
-
-    // email → { is_admin }
-    const adminByEmail: Record<string, boolean> = {}
-    for (const e of (emailData ?? [])) adminByEmail[e.email] = e.is_admin
-
-    // Build memberByEmail and emailByPlayerName
-    const byEmail: Record<string, MemberInfo> = {}
-    const byName: Record<string, string> = {}
-    for (const p of (profiles ?? [])) {
-      if (!p.email) continue
-      byEmail[p.email] = {
-        email: p.email,
-        is_admin: adminByEmail[p.email] ?? false,
-        last_seen_at: p.last_seen_at ?? null,
-      }
-      if (p.name) byName[p.name.toLowerCase()] = p.email
+    // last_seen_at by email from profiles
+    const lastSeenByEmail: Record<string, string | null> = {}
+    for (const p of (profilesData ?? [])) {
+      if (p.email) lastSeenByEmail[p.email] = p.last_seen_at ?? null
     }
 
+    const emails: string[] = []
+    const byEmail: Record<string, MemberInfo> = {}
+    for (const e of (emailData ?? [])) {
+      emails.push(e.email)
+      byEmail[e.email] = { email: e.email, is_admin: e.is_admin, last_seen_at: lastSeenByEmail[e.email] ?? null }
+    }
+    setAllEmails(emails)
     setMemberByEmail(byEmail)
-    setEmailByPlayerName(byName)
+    setLoadingData(false)
   }
 
   async function addPlayer(e: React.FormEvent) {
@@ -135,7 +126,7 @@ export default function FieldPage() {
     setAdding(true)
     const { error } = await db.from('players').insert({ name })
     if (error) { toast.error('Failed to add player') }
-    else { toast.success(`${name} added!`); setNewName(''); setShowAdd(false); await loadPlayers() }
+    else { toast.success(`${name} added!`); setNewName(''); setShowAdd(false); await loadAll() }
     setAdding(false)
   }
 
@@ -143,7 +134,16 @@ export default function FieldPage() {
     if (!confirm(`Remove ${player.name} from the roster?`)) return
     const { error } = await db.from('players').delete().eq('id', player.id)
     if (error) { toast.error('Failed to remove player') }
-    else { toast.success(`${player.name} removed`); await loadPlayers() }
+    else { toast.success(`${player.name} removed`); await loadAll() }
+  }
+
+  async function linkEmail(playerId: string, email: string | null) {
+    setSavingEmail(playerId)
+    const { error } = await db.from('players').update({ account_email: email }).eq('id', playerId)
+    if (error) { toast.error('Failed to link account') }
+    else { await loadAll() }
+    setSavingEmail(null)
+    setEmailDropdownOpen(null)
   }
 
   function triggerAvatarUpload(playerId: string) {
@@ -162,7 +162,7 @@ export default function FieldPage() {
     const { data: { publicUrl } } = supabase.storage.from('player-avatars').getPublicUrl(path)
     const { error } = await db.from('players').update({ avatar_url: publicUrl }).eq('id', uploadingFor)
     if (error) { toast.error('Failed to save photo') }
-    else { toast.success('Photo updated!'); await loadPlayers() }
+    else { toast.success('Photo updated!'); await loadAll() }
     setUploadingFor(null)
   }
 
@@ -174,7 +174,7 @@ export default function FieldPage() {
     setSavingNicknames(playerId)
     const { error } = await db.from('players').update({ nicknames: [...existing, alias] }).eq('id', playerId)
     if (error) toast.error('Failed to save alias')
-    else { setNicknameEdits(prev => ({ ...prev, [playerId]: '' })); await loadPlayers() }
+    else { setNicknameEdits(prev => ({ ...prev, [playerId]: '' })); await loadAll() }
     setSavingNicknames(null)
   }
 
@@ -183,7 +183,7 @@ export default function FieldPage() {
     setSavingNicknames(playerId)
     const { error } = await db.from('players').update({ nicknames: existing.filter(n => n !== alias) }).eq('id', playerId)
     if (error) toast.error('Failed to remove alias')
-    else await loadPlayers()
+    else await loadAll()
     setSavingNicknames(null)
   }
 
@@ -194,7 +194,7 @@ export default function FieldPage() {
     setSavingHcp(playerId)
     const { error } = await db.from('players').update({ hcp }).eq('id', playerId)
     if (error) toast.error('Failed to save HCP')
-    else await loadPlayers()
+    else await loadAll()
     setSavingHcp(null)
   }
 
@@ -206,7 +206,7 @@ export default function FieldPage() {
       .select('email', { count: 'exact', head: true })
     if (error) { toast.error(error.message) }
     else if (count === 0) { toast.error('Permission denied — check Supabase RLS policies') }
-    else { toast.success(`${email} is ${!current ? 'now an admin' : 'no longer an admin'}`); await loadMemberMap() }
+    else { toast.success(`${email} is ${!current ? 'now an admin' : 'no longer an admin'}`); await loadAll() }
     setToggling(null)
   }
 
@@ -222,6 +222,7 @@ export default function FieldPage() {
   }
 
   const filtered = players.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
+  const usedEmails = new Set(players.map(p => p.account_email).filter(Boolean))
 
   return (
     <div style={{ background: 'var(--bunker-sand)', minHeight: '100%' }}>
@@ -272,9 +273,13 @@ export default function FieldPage() {
 
       <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarFile} />
 
-      {/* Player list */}
+      {/* Close dropdown backdrop */}
+      {emailDropdownOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setEmailDropdownOpen(null)} />
+      )}
+
       <div style={{ padding: '0 16px 40px' }}>
-        {loadingPlayers ? (
+        {loadingData ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--ink-faint)', fontSize: 14 }}>Loading…</div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-soft)', fontSize: 14 }}>
@@ -284,11 +289,11 @@ export default function FieldPage() {
           <div style={{ background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 12, boxShadow: 'var(--shadow-card)', overflow: 'hidden' }}>
             {filtered.map((p, idx) => {
               const isUploading = uploadingFor === p.id
-              const email = emailByPlayerName[p.name.toLowerCase()]
-              const member = email ? memberByEmail[email] : undefined
+              const member = p.account_email ? memberByEmail[p.account_email] : undefined
               const hasAccount = !!member
               const isSuperAdmin = member?.email === ADMIN_EMAIL
-              const isActive = hasAccount
+              const availableEmails = allEmails.filter(e => !usedEmails.has(e) || e === p.account_email)
+
               return (
                 <div key={p.id} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid var(--bunker-sand-deep)' : 'none', padding: '16px' }}>
                   <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
@@ -304,29 +309,61 @@ export default function FieldPage() {
                     {/* Main info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
 
-                      {/* Name row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 2 }}>
+                      {/* Name + status */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
                         <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{p.name}</span>
                         {hasAccount ? (
-                          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 999, background: 'rgba(31,122,76,.12)', color: 'var(--fairway-green)' }}>
-                            Active
-                          </span>
+                          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 999, background: 'rgba(31,122,76,.12)', color: 'var(--fairway-green)' }}>Active</span>
                         ) : (
-                          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 999, background: 'rgba(0,0,0,.06)', color: 'var(--ink-faint)' }}>
-                            No account
-                          </span>
+                          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 999, background: 'rgba(0,0,0,.06)', color: 'var(--ink-faint)' }}>No account</span>
                         )}
                       </div>
 
-                      {/* Email row */}
-                      {hasAccount && (
-                        <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {member!.email}
-                        </div>
-                      )}
+                      {/* Account email picker */}
+                      <div style={{ position: 'relative', marginBottom: 6 }}>
+                        <button
+                          onClick={() => setEmailDropdownOpen(emailDropdownOpen === p.id ? null : p.id)}
+                          disabled={savingEmail === p.id}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                            height: 28, padding: '0 10px', borderRadius: 6, border: '1px solid var(--bunker-sand-deep)',
+                            background: hasAccount ? 'rgba(31,122,76,.05)' : 'var(--bunker-sand)',
+                            color: hasAccount ? 'var(--ink)' : 'var(--ink-faint)',
+                            fontSize: 12, cursor: 'pointer', maxWidth: '100%',
+                          }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.account_email ?? 'Link account…'}
+                          </span>
+                          <ChevronDown size={12} strokeWidth={2} style={{ flexShrink: 0 }} />
+                        </button>
+                        {emailDropdownOpen === p.id && (
+                          <div style={{ position: 'absolute', top: 32, left: 0, zIndex: 10, background: '#fff', border: '1px solid var(--bunker-sand-deep)', borderRadius: 8, boxShadow: 'var(--shadow-pop)', minWidth: 220, overflow: 'hidden' }}>
+                            {p.account_email && (
+                              <button
+                                onClick={() => linkEmail(p.id, null)}
+                                style={{ width: '100%', padding: '10px 14px', textAlign: 'left', border: 0, borderBottom: '1px solid var(--bunker-sand-deep)', background: 'transparent', color: 'var(--tournament-red)', fontSize: 13, cursor: 'pointer' }}
+                              >
+                                Unlink account
+                              </button>
+                            )}
+                            {availableEmails.length === 0 ? (
+                              <div style={{ padding: '10px 14px', fontSize: 13, color: 'var(--ink-faint)' }}>No unlinked accounts</div>
+                            ) : availableEmails.map(email => (
+                              <button
+                                key={email}
+                                onClick={() => linkEmail(p.id, email)}
+                                style={{ width: '100%', padding: '10px 14px', textAlign: 'left', border: 0, borderBottom: '1px solid var(--bunker-sand-deep)', background: email === p.account_email ? 'rgba(31,122,76,.07)' : 'transparent', color: 'var(--ink)', fontSize: 13, cursor: 'pointer' }}
+                              >
+                                {email}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
 
-                      {/* Last seen + HCP row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                      {/* Last seen + HCP */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
                         {hasAccount && (
                           <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>
                             Last seen: <strong>{formatLastSeen(member!.last_seen_at)}</strong>
