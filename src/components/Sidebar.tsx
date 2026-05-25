@@ -116,13 +116,13 @@ export function Sidebar() {
                 Admin
               </button>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8 }}>
               <PlayerAvatar
                 name={session.user.user_metadata?.name ?? session.user.email ?? '?'}
                 avatarUrl={session.user.user_metadata?.avatar_url}
-                size={36}
+                size={22}
               />
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#B9C5D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {firstName || session.user.email}
               </div>
             </div>
