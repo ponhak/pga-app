@@ -36,27 +36,32 @@ export default function PlanningPage() {
   const [unsavedPrompt, setUnsavedPrompt] = useState<(() => void) | null>(null)
   const [profileNames, setProfileNames]   = useState<Record<string, string>>({})
   const [profileAvatars, setProfileAvatars] = useState<Record<string, string | null>>({})
+  const [playerByEmail, setPlayerByEmail] = useState<Record<string, { name: string; avatar_url: string | null }>>({})
   const [roundDates, setRoundDates]     = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     if (!session) return
-    const [{ data }, { data: profiles }, { data: rounds }] = await Promise.all([
+    const [{ data }, { data: profiles }, { data: players }, { data: rounds }] = await Promise.all([
       db.from('availability_blocks')
         .select('date, user_id, user_email')
         .gte('date', `${year}-01-01`)
         .lte('date', `${year}-12-31`),
-      db.from('profiles').select('id, name, avatar_url'),
+      db.from('profiles').select('id, name'),
+      db.from('players').select('account_email, name, avatar_url').not('account_email', 'is', null),
       db.from('rounds').select('date').gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
     ])
     setRoundDates(new Set((rounds ?? []).map((r: { date: string }) => r.date)))
     const nameMap: Record<string, string> = {}
-    const avatarMap: Record<string, string | null> = {}
-    ;(profiles ?? []).forEach((p: { id: string; name: string; avatar_url: string | null }) => {
+    ;(profiles ?? []).forEach((p: { id: string; name: string }) => {
       nameMap[p.id] = p.name
-      avatarMap[p.id] = p.avatar_url ?? null
     })
     setProfileNames(nameMap)
-    setProfileAvatars(avatarMap)
+    setProfileAvatars({})
+    const pByEmail: Record<string, { name: string; avatar_url: string | null }> = {}
+    ;(players ?? []).forEach((p: { account_email: string; name: string; avatar_url: string | null }) => {
+      pByEmail[p.account_email] = { name: p.name, avatar_url: p.avatar_url }
+    })
+    setPlayerByEmail(pByEmail)
     const blocks: Block[] = data ?? []
     setAllBlocks(blocks)
     const mine = new Set(
@@ -409,8 +414,9 @@ export default function PlanningPage() {
                     allBlocks
                       .filter(b => b.date === selectedDate)
                       .map(b => {
-                        const name = profileNames[b.user_id] || b.user_email
-                        const avatarUrl = profileAvatars[b.user_id] ?? null
+                        const player = playerByEmail[b.user_email]
+                        const name = player?.name || profileNames[b.user_id] || b.user_email
+                        const avatarUrl = player?.avatar_url ?? null
                         return (
                           <div key={b.user_email} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                             <PlayerAvatar name={name} avatarUrl={avatarUrl} size={28} />
