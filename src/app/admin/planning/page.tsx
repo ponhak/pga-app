@@ -20,10 +20,134 @@ interface PlanRound {
   linked_round_id: string | null  // tracks the corresponding schedule round
 }
 
-function availabilityBg(count: number): string {
-  if (count >= 2) return 'rgba(200,16,46,.18)'
-  if (count === 1) return 'rgba(201,162,74,.32)'
-  return '#fff'
+const MONTH_NAMES_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December']
+const DAY_LABELS_SHORT = ['Mo','Tu','We','Th','Fr','Sa','Su']
+
+function AvailabilityDatePicker({ value, onChange, blockMap, blockDetails }: {
+  value: string
+  onChange: (date: string) => void
+  blockMap: Record<string, number>
+  blockDetails: Record<string, string[]>
+}) {
+  const parsed    = value ? value.split('-').map(Number) : null
+  const [open, setOpen]       = useState(false)
+  const [viewYear, setViewYear]   = useState(parsed ? parsed[0] : THIS_YEAR)
+  const [viewMonth, setViewMonth] = useState(parsed ? parsed[1] - 1 : new Date().getMonth())
+
+  useEffect(() => {
+    if (value) { setViewYear(Number(value.split('-')[0])); setViewMonth(Number(value.split('-')[1]) - 1) }
+  }, [value])
+
+  const cnt        = value ? (blockMap[value] ?? 0) : 0
+  const borderCol  = cnt >= 2 ? 'var(--tournament-red)' : cnt === 1 ? '#C9A24A' : 'var(--bunker-sand-deep)'
+  const bgCol      = cnt >= 2 ? 'rgba(200,16,46,.22)' : cnt === 1 ? 'rgba(201,162,74,.32)' : '#fff'
+
+  function prevMonth() { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) } else setViewMonth(m => m - 1) }
+  function nextMonth() { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) } else setViewMonth(m => m + 1) }
+
+  const firstDay    = new Date(viewYear, viewMonth, 1)
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
+  const offset      = (firstDay.getDay() + 6) % 7
+
+  function selectDay(day: number) {
+    const d = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    onChange(d); setOpen(false)
+  }
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      {open && <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setOpen(false)} />}
+
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '100%', height: 36, padding: '0 10px',
+          background: bgCol,
+          border: `${cnt > 0 ? '2px' : '1.5px'} solid ${borderCol}`,
+          borderRadius: 7, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          boxSizing: 'border-box', fontFamily: 'var(--font-body)', fontSize: 14,
+          color: value ? 'var(--ink)' : 'rgba(0,0,0,.35)',
+        }}
+      >
+        <span>{value || 'yyyy-mm-dd'}</span>
+        {cnt > 0 && (
+          <span style={{
+            minWidth: 18, height: 18, borderRadius: 9, flexShrink: 0,
+            background: cnt >= 2 ? 'var(--tournament-red)' : '#C9A24A',
+            color: '#fff', fontSize: 10, fontWeight: 800,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+          }}>{cnt}</span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 42, left: 0, zIndex: 50,
+          background: '#fff', border: '1px solid var(--bunker-sand-deep)',
+          borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.18)',
+          padding: '12px', width: 252,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <button type="button" onClick={prevMonth} style={{ width: 26, height: 26, borderRadius: 5, border: '1px solid var(--bunker-sand-deep)', background: 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1 }}>‹</button>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{MONTH_NAMES_LONG[viewMonth]} {viewYear}</span>
+            <button type="button" onClick={nextMonth} style={{ width: 26, height: 26, borderRadius: 5, border: '1px solid var(--bunker-sand-deep)', background: 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1 }}>›</button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+            {DAY_LABELS_SHORT.map(d => (
+              <div key={d} style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-faint)', padding: '2px 0' }}>{d}</div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+            {Array.from({ length: offset }).map((_, i) => <div key={`e${i}`} />)}
+            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+              const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+              const dayCnt  = blockMap[dateStr] ?? 0
+              const names   = blockDetails[dateStr]
+              const isSelected = value === dateStr
+              const cellBg  = isSelected ? 'var(--tour-navy)' : dayCnt >= 2 ? 'rgba(200,16,46,.30)' : dayCnt === 1 ? 'rgba(201,162,74,.45)' : '#f8f7f4'
+              const cellBorder = isSelected ? '2px solid var(--tour-navy)' : dayCnt >= 2 ? '1.5px solid rgba(200,16,46,.5)' : dayCnt === 1 ? '1.5px solid rgba(201,162,74,.6)' : '1px solid transparent'
+              return (
+                <div
+                  key={day}
+                  onClick={() => selectDay(day)}
+                  title={names?.length ? `Blocked: ${names.join(', ')}` : undefined}
+                  style={{
+                    aspectRatio: '1', borderRadius: 6, background: cellBg, border: cellBorder,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    position: 'relative', cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: isSelected ? 700 : 500, color: isSelected ? '#fff' : 'var(--ink)', lineHeight: 1 }}>{day}</span>
+                  {dayCnt > 0 && !isSelected && (
+                    <span style={{
+                      position: 'absolute', top: 2, right: 2, width: 12, height: 12, borderRadius: 6,
+                      background: dayCnt >= 2 ? 'var(--tournament-red)' : '#a07c1a',
+                      color: '#fff', fontSize: 7, fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>{dayCnt}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {value && (
+            <button
+              type="button"
+              onClick={() => { onChange(''); setOpen(false) }}
+              style={{ marginTop: 10, width: '100%', height: 30, borderRadius: 6, border: '1px solid var(--bunker-sand-deep)', background: 'transparent', color: 'var(--ink-soft)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function inputStyle(overrides?: React.CSSProperties): React.CSSProperties {
@@ -485,43 +609,12 @@ export default function PlanningPage() {
                     onChange={e => updateRound(i, { name: e.target.value })}
                     style={{ ...inputStyle(), width: '100%' }}
                   />
-                  {(() => {
-                    const cnt = r.date ? (blockMap[r.date] ?? 0) : 0
-                    const borderColor = cnt >= 2 ? 'var(--tournament-red)' : cnt === 1 ? '#C9A24A' : 'var(--bunker-sand-deep)'
-                    const badgeBg    = cnt >= 2 ? 'var(--tournament-red)' : '#C9A24A'
-                    const names      = r.date ? (blockDetails[r.date] ?? []) : []
-                    return (
-                      <div style={{ position: 'relative', width: '100%' }}>
-                        <input
-                          type="date"
-                          value={r.date}
-                          onChange={e => updateRound(i, { date: e.target.value })}
-                          title={names.length ? `Blocked: ${names.join(', ')}` : undefined}
-                          style={{
-                            ...inputStyle({
-                              background: r.date ? availabilityBg(cnt) : '#fff',
-                              borderColor,
-                              borderWidth: cnt > 0 ? '2px' : '1.5px',
-                            }),
-                            width: '100%', colorScheme: 'light',
-                          }}
-                        />
-                        {cnt > 0 && (
-                          <span style={{
-                            position: 'absolute', top: -7, right: -7,
-                            minWidth: 18, height: 18, borderRadius: 9,
-                            background: badgeBg, color: '#fff',
-                            fontSize: 10, fontWeight: 800,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            border: '2px solid #fff', padding: '0 3px',
-                            pointerEvents: 'none', lineHeight: 1,
-                          }}>
-                            {cnt}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })()}
+                  <AvailabilityDatePicker
+                    value={r.date}
+                    onChange={date => updateRound(i, { date })}
+                    blockMap={blockMap}
+                    blockDetails={blockDetails}
+                  />
                   <button
                     type="button"
                     onClick={() => updateRound(i, { double_points: !r.double_points })}
