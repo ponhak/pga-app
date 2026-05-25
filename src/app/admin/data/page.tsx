@@ -157,8 +157,9 @@ export default function ManageDataPage() {
 
   // Historical round form
   const [showHist, setShowHist]     = useState(false)
-  const [histDate, setHistDate]     = useState('')
-  const [histVenue, setHistVenue]   = useState('')
+  const [histDate, setHistDate]           = useState('')
+  const [histVenue, setHistVenue]         = useState('')
+  const [histDoublePoints, setHistDoublePoints] = useState(false)
   const [histScores, setHistScores] = useState<Record<string, string>>({})
   const [histNetDiff, setHistNetDiff] = useState<Record<string, string>>({})
   const [histGrossScores, setHistGrossScores] = useState<Record<string, string>>({})
@@ -406,9 +407,10 @@ export default function ManageDataPage() {
     setHistSaving(true)
 
     const { data: newRound, error: roundErr } = await db.from('rounds').insert({
-      date:       histDate,
-      notes:      histVenue.trim() || null,
-      group_size: 4,
+      date:          histDate,
+      notes:         histVenue.trim() || null,
+      group_size:    4,
+      double_points: histDoublePoints,
     }).select('id').single()
 
     if (roundErr) {
@@ -483,6 +485,7 @@ export default function ManageDataPage() {
       setShowHist(false)
       setHistDate('')
       setHistVenue('')
+      setHistDoublePoints(false)
       setHistScores({})
       setHistNetDiff({})
       setHistGrossScores({})
@@ -826,6 +829,36 @@ export default function ManageDataPage() {
                   <label style={label()}>Venue</label>
                   <input type="text" value={histVenue} onChange={e => setHistVenue(e.target.value)}
                     placeholder="e.g. Schager GK" style={textInput()} />
+                </div>
+
+                {/* Double points toggle */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setHistDoublePoints(v => !v)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      width: '100%', padding: '10px 14px', borderRadius: 8,
+                      border: `1.5px solid ${histDoublePoints ? 'var(--trophy-gold)' : 'var(--bunker-sand-deep)'}`,
+                      background: histDoublePoints ? 'rgba(201,162,74,.10)' : 'transparent',
+                      cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    <div style={{
+                      width: 36, height: 20, borderRadius: 10,
+                      background: histDoublePoints ? 'var(--trophy-gold)' : '#ccc',
+                      position: 'relative', flexShrink: 0, transition: 'background .15s',
+                    }}>
+                      <div style={{
+                        position: 'absolute', top: 2, left: histDoublePoints ? 18 : 2,
+                        width: 16, height: 16, borderRadius: 8,
+                        background: '#fff', transition: 'left .15s',
+                      }} />
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: histDoublePoints ? 'var(--ink)' : 'var(--ink-soft)' }}>
+                      Double points round
+                    </span>
+                  </button>
                 </div>
 
                 {/* Net scores per player */}
