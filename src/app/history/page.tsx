@@ -341,8 +341,9 @@ export default function HistoryPage() {
         const agg: Record<string, { points: number; rounds: number; wins: number }> = {}
         for (const s of yearScores) {
           if (!agg[s.player_id]) agg[s.player_id] = { points: 0, rounds: 0, wins: 0 }
+          const isDns = s.dnf === true && (s.points_earned === 0 || s.points_earned == null)
           agg[s.player_id].points += Number(s.points_earned ?? 0)
-          agg[s.player_id].rounds += 1
+          if (!isDns) agg[s.player_id].rounds += 1
           if (s.rank === 1) agg[s.player_id].wins += 1
         }
 
