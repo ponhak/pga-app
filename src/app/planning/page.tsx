@@ -283,7 +283,7 @@ export default function PlanningPage() {
       )}
 
       {/* Calendar months */}
-      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4">
         {MONTH_NAMES.map((monthName, monthIdx) => {
           const firstDay = new Date(year, monthIdx, 1)
           const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
