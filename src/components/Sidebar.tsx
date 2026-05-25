@@ -110,13 +110,17 @@ export function Sidebar() {
             {isAdmin && (
               <button
                 onClick={() => router.push('/admin')}
-                style={sidebarAction()}
+                style={{
+                  ...sidebarAction(),
+                  color: pathname === '/admin' ? 'var(--trophy-gold)' : '#B9C5D9',
+                  background: pathname === '/admin' ? 'rgba(201,162,74,.12)' : 'transparent',
+                }}
               >
                 <ShieldCheck size={16} strokeWidth={2} />
                 Admin
               </button>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8 }}>
+            <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, boxSizing: 'border-box' }}>
               <PlayerAvatar
                 name={session.user.user_metadata?.name ?? session.user.email ?? '?'}
                 avatarUrl={session.user.user_metadata?.avatar_url}
