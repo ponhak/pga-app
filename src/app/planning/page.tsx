@@ -34,16 +34,19 @@ export default function PlanningPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [unsavedPrompt, setUnsavedPrompt] = useState<(() => void) | null>(null)
   const [profileNames, setProfileNames] = useState<Record<string, string>>({})
+  const [roundDates, setRoundDates]     = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     if (!session) return
-    const [{ data }, { data: profiles }] = await Promise.all([
+    const [{ data }, { data: profiles }, { data: rounds }] = await Promise.all([
       db.from('availability_blocks')
         .select('date, user_id, user_email')
         .gte('date', `${year}-01-01`)
         .lte('date', `${year}-12-31`),
       db.from('profiles').select('id, name'),
+      db.from('rounds').select('date').gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
     ])
+    setRoundDates(new Set((rounds ?? []).map((r: { date: string }) => r.date)))
     const nameMap: Record<string, string> = {}
     ;(profiles ?? []).forEach((p: { id: string; name: string }) => { nameMap[p.id] = p.name })
     setProfileNames(nameMap)
@@ -66,6 +69,7 @@ export default function PlanningPage() {
   }
 
   function dayBg(dateStr: string) {
+    if (roundDates.has(dateStr)) return 'rgba(31,122,76,.18)'
     const count = blockCount(dateStr)
     if (count === 0) return '#fff'
     if (count === 1) return 'rgba(201,162,74,.28)'
@@ -197,6 +201,7 @@ export default function PlanningPage() {
         {mode === 'plan' && (
           <LegendItem dot color="var(--tournament-red)" label="Your blocked dates" />
         )}
+        <LegendItem color="rgba(31,122,76,.45)" label="Scheduled round" />
         <LegendItem color="rgba(201,162,74,.7)" label="1 person blocked" />
         <LegendItem color="rgba(200,16,46,.5)" label="2+ people blocked" />
       </div>
