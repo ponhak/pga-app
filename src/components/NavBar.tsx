@@ -143,8 +143,8 @@ export function NavBar() {
           PGA Schager
         </div>
 
-        {/* User button */}
-        <div style={{ position: 'relative' }}>
+        {/* User button — hidden on desktop where sidebar handles auth */}
+        <div className="md:hidden" style={{ position: 'relative' }}>
           <button
             aria-label={session ? 'Account menu' : 'Sign in'}
             onClick={() => session ? setMenuOpen(v => !v) : router.push('/login')}

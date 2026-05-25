@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Home, CalendarDays, Trophy, CalendarRange, LogIn, LogOut, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
 
 const BASE_TABS = [
   { id: 'home',     href: '/',         label: 'Home',         Icon: Home },
@@ -106,6 +107,21 @@ export function Sidebar() {
       <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', padding: '12px 8px' }}>
         {session ? (
           <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px 10px' }}>
+              <PlayerAvatar
+                name={session.user.user_metadata?.name ?? session.user.email ?? '?'}
+                avatarUrl={session.user.user_metadata?.avatar_url}
+                size={36}
+              />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#F5EFE0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {firstName || session.user.email}
+                </div>
+                <div style={{ fontSize: 10, color: '#8895AC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {session.user.email}
+                </div>
+              </div>
+            </div>
             {isAdmin && (
               <button
                 onClick={() => router.push('/admin')}
@@ -115,9 +131,6 @@ export function Sidebar() {
                 Admin
               </button>
             )}
-            <div style={{ padding: '8px 12px 4px', fontSize: 11, color: '#8895AC', letterSpacing: '.04em', wordBreak: 'break-all' }}>
-              {session.user.email}
-            </div>
             <button onClick={handleLogout} style={sidebarAction(true)}>
               <LogOut size={16} strokeWidth={2} />
               Sign out
