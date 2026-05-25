@@ -84,7 +84,7 @@ function AvailabilityDatePicker({ value, onChange, blockMap, blockDetails }: {
 
       {open && (
         <div style={{
-          position: 'absolute', top: 42, left: 0, zIndex: 50,
+          position: 'absolute', top: 42, right: 0, zIndex: 50,
           background: '#fff', border: '1px solid var(--bunker-sand-deep)',
           borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.18)',
           padding: '16px', width: 276,
