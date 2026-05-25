@@ -11,7 +11,7 @@ const BASE_TABS = [
   { id: 'history',  href: '/history',  label: 'History',  Icon: Trophy },
 ]
 
-const PLANNING_TAB = { id: 'planning', href: '/planning', label: 'Availability', Icon: CalendarRange }
+const PLANNING_TAB = { id: 'planning', href: '/planning', label: 'Avail', Icon: CalendarRange }
 
 export function BottomTabBar() {
   const pathname = usePathname()
