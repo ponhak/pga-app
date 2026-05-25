@@ -105,7 +105,7 @@ function PlayerStatsPanel({
   const currentPos = posPoints.reduceRight<number | null>((acc, p) => acc ?? (p.played ? p.pos : null), null)
 
   // Chart geometry
-  const CW = 300, CH = 220
+  const CW = 300, CH = 160
   const LEFT = 32, RIGHT = 8, TOP = 12, BOTTOM = 20
   const chartW = CW - LEFT - RIGHT
   const chartH = CH - TOP - BOTTOM
@@ -136,14 +136,14 @@ function PlayerStatsPanel({
 
   const pill = (label: string, value: string, gold = false) => (
     <div key={label} style={{
-      padding: '10px 12px',
+      padding: '8px 10px',
       background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.10)',
       borderRadius: 8,
     }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 5 }}>
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,.45)', marginBottom: 4 }}>
         {label}
       </div>
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: gold ? 'var(--trophy-gold)' : '#F5EFE0', lineHeight: 1 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: gold ? 'var(--trophy-gold)' : '#F5EFE0', lineHeight: 1 }}>
         {value}
       </div>
     </div>
@@ -152,165 +152,174 @@ function PlayerStatsPanel({
   return (
     <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', background: 'rgba(5,15,30,.6)' }}>
 
-      {/*
-        DOM order (= mobile stack): Season → Chart → Table → Career
-        Desktop (lg) grid:
-          col1/row1 = Season    col2/row1+2 = Table    col3/row1 = Chart
-          col1/row2 = Career
-      */}
-      <div className="lg:grid lg:grid-cols-[280px_1fr_320px] stats-panel-cols">
+      {/* On desktop: season stats (left) + chart (right) side-by-side */}
+      <div className="md:grid md:grid-cols-[1fr_320px]">
 
-        {/* Season: col1 row1 on desktop */}
-        <div className="lg:col-start-1 lg:row-start-1" style={{ padding: '16px 16px 0' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#F5EFE0', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,.12)' }}>
-            {new Date().getFullYear()} Season
-          </div>
-          <div className="grid grid-cols-3 lg:grid-cols-2 gap-2">
-            {pill('Wins', `${standing.wins}`, standing.wins > 0)}
-            {pill('Best finish', bestFinish != null ? ordinal(bestFinish) : '—')}
-            {pill('Avg finish',  avgFinish  != null ? ordinal(Math.round(avgFinish)) : '—')}
-            {pill('Avg net',     avgNet     != null ? String(Math.round(avgNet)) : '—')}
-            {pill('Pts / round', ptsPerRound != null ? formatPts(Math.round(ptsPerRound * 10) / 10) : '—')}
-          </div>
+      {/* Season section */}
+      <div style={{ padding: '14px 14px 0' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#F5EFE0', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.12)' }}>
+          {new Date().getFullYear()} Season
         </div>
 
-        {/* Chart: col3 row1 on desktop — second in DOM so it appears after Season on mobile */}
-        {allRounds.length > 0 && (
-          <div className="lg:col-start-3 lg:row-start-1" style={{ padding: '16px 16px 0' }}>
-            {/* Section heading matches Season / Rounds style */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,.12)' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#F5EFE0' }}>
+        {/* Stat grid — 3 columns, wraps to 2 rows */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+          {pill('Wins', `${standing.wins}`, standing.wins > 0)}
+          {pill('Best finish', bestFinish != null ? ordinal(bestFinish) : '—')}
+          {pill('Avg finish',  avgFinish  != null ? ordinal(Math.round(avgFinish)) : '—')}
+          {pill('Avg net',     avgNet     != null ? String(Math.round(avgNet)) : '—')}
+          {pill('Pts / round', ptsPerRound != null ? formatPts(Math.round(ptsPerRound * 10) / 10) : '—')}
+        </div>
+      </div>
+
+      {/* Position chart — highlight card */}
+      {allRounds.length > 0 && (
+        <div style={{ padding: '10px 14px 0' }}>
+          <div style={{
+            background: 'rgba(255,255,255,.04)',
+            border: '1px solid rgba(255,255,255,.09)',
+            borderRadius: 10,
+            padding: '12px 12px 10px',
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,.40)' }}>
                 Season Standings
               </span>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: 'var(--trophy-gold)', lineHeight: 1 }}>
+              <span style={{
+                fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700,
+                color: 'var(--trophy-gold)', lineHeight: 1,
+              }}>
                 {currentPos != null ? ordinal(currentPos) : '—'}
               </span>
             </div>
-            {/* Chart fills the column */}
-            <div style={{
-              background: 'rgba(255,255,255,.04)',
-              border: '1px solid rgba(255,255,255,.09)',
-              borderRadius: 10,
-              padding: '12px 12px 10px',
-            }}>
-              <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" width="100%" height={CH}
-                   style={{ display: 'block', overflow: 'visible' }}>
-                {yAxisPositions.map((pos) => (
-                  <g key={pos}>
-                    <line x1={LEFT} y1={sy(pos)} x2={CW - RIGHT} y2={sy(pos)}
-                      stroke="rgba(255,255,255,.08)" strokeWidth="1" strokeDasharray={pos === 1 ? 'none' : '3 5'} />
-                    <text x={LEFT - 4} y={sy(pos) + 3.5} textAnchor="end"
-                      style={{ fontSize: 8, fill: 'rgba(255,255,255,.35)', fontFamily: 'monospace' }}>
-                      {ordinal(pos)}
-                    </text>
-                  </g>
-                ))}
-                {contextLine && (
-                  <polyline points={contextLine}
-                    fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="1.5" strokeDasharray="3 5" />
-                )}
-                {playedPolyline && (
-                  <polyline points={playedPolyline} fill="none" stroke="var(--trophy-gold)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-                )}
-                {posPoints.map((p, i) => p.played && p.pos != null && (
-                  <circle key={i} cx={sx(i)} cy={sy(p.pos)}
-                    r={i === posPoints.length - 1 ? 4.5 : 3}
-                    fill="var(--trophy-gold)" />
-                ))}
-                {allRounds.map((_, i) => (
-                  <text key={i} x={sx(i)} y={CH} textAnchor="middle"
-                    style={{ fontSize: 8, fill: 'rgba(255,255,255,.35)', fontFamily: 'monospace' }}>
-                    {`R${i + 1}`}
-                  </text>
-                ))}
-              </svg>
-            </div>
-          </div>
-        )}
 
-        {/* Round table: col2 rows 1+2 on desktop — third in DOM so it appears after Chart on mobile */}
-        <div className="lg:col-start-2 lg:row-start-1 lg:row-span-2" style={{ padding: '16px 16px 0' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#F5EFE0', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,.12)' }}>
-            Rounds
+            <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" width="100%" height={CH}
+                 style={{ display: 'block', overflow: 'visible' }}>
+
+              {/* Y-axis grid lines + labels (1st at top, last at bottom) */}
+              {yAxisPositions.map((pos) => (
+                <g key={pos}>
+                  <line x1={LEFT} y1={sy(pos)} x2={CW - RIGHT} y2={sy(pos)}
+                    stroke="rgba(255,255,255,.08)" strokeWidth="1" strokeDasharray={pos === 1 ? 'none' : '3 5'} />
+                  <text x={LEFT - 4} y={sy(pos) + 3.5} textAnchor="end"
+                    style={{ fontSize: 8, fill: 'rgba(255,255,255,.35)', fontFamily: 'monospace' }}>
+                    {ordinal(pos)}
+                  </text>
+                </g>
+              ))}
+
+              {/* Dashed context line (carry-forward position for unplayed rounds) */}
+              {contextLine && (
+                <polyline points={contextLine}
+                  fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="1.5" strokeDasharray="3 5" />
+              )}
+
+              {/* Gold position line (played rounds only) */}
+              {playedPolyline && (
+                <polyline points={playedPolyline} fill="none" stroke="var(--trophy-gold)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+              )}
+
+              {/* Dots at played rounds */}
+              {posPoints.map((p, i) => p.played && p.pos != null && (
+                <circle key={i} cx={sx(i)} cy={sy(p.pos)}
+                  r={i === posPoints.length - 1 ? 4.5 : 3}
+                  fill="var(--trophy-gold)" />
+              ))}
+
+              {/* X-axis round labels: R1, R2, … */}
+              {allRounds.map((_, i) => (
+                <text key={i} x={sx(i)} y={CH} textAnchor="middle"
+                  style={{ fontSize: 8, fill: 'rgba(255,255,255,.35)', fontFamily: 'monospace' }}>
+                  {`R${i + 1}`}
+                </text>
+              ))}
+            </svg>
           </div>
-          <div className="grid grid-cols-[1fr_56px_56px_60px_56px] md:grid-cols-[1fr_68px_68px_72px_68px]" style={{ paddingBottom: 4, borderBottom: '1px solid rgba(255,255,255,.08)', marginBottom: 2 }}>
-            {['Date', 'Rank', 'Net', '+/−', 'Pts'].map((h, i) => (
-              <span key={h} style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', textAlign: i > 0 ? 'center' : 'left' }}>
-                {h}
+        </div>
+      )}
+
+      </div>{/* end md:grid */}
+
+      {/* Round table */}
+      <div style={{ padding: '10px 14px 0' }}>
+        {/* Header */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 44px', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,.08)', marginBottom: 2 }}>
+          {['Date', 'Rank', 'Net', '+/−', 'Pts'].map((h, i) => (
+            <span key={h} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.35)', textAlign: i > 0 ? 'center' : 'left' }}>
+              {h}
+            </span>
+          ))}
+        </div>
+        {allRounds.map((r, i) => {
+          const sc = allScores.find(s => s.round_id === r.id && s.player_id === player.id)
+          const played = sc && sc.strokes != null
+          const isDnf  = sc?.dnf === true
+          const d = new Date(r.date + 'T12:00:00')
+          const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+          const diffColor = sc?.net_diff == null ? 'rgba(255,255,255,.30)'
+            : sc.net_diff < 0 ? 'var(--tournament-red)' : '#F5EFE0'
+
+          return (
+            <div key={r.id} style={{
+              display: 'grid', gridTemplateColumns: '1fr 44px 44px 44px 44px',
+              alignItems: 'center', padding: '7px 0',
+              borderBottom: i < allRounds.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none',
+              opacity: played || isDnf ? 1 : 0.38,
+            }}>
+              <div>
+                <span style={{ fontSize: 12, color: '#F5EFE0', fontWeight: 500 }}>{dateStr}</span>
+                {r.double_points && <span style={{ marginLeft: 4, fontSize: 9, color: 'var(--trophy-gold)' }}>⚡</span>}
+                {r.notes && <div style={{ fontSize: 10, color: 'rgba(255,255,255,.40)', marginTop: 1 }}>{r.notes}</div>}
+              </div>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, textAlign: 'center',
+                color: isDnf ? 'var(--tournament-red)' : played ? '#F5EFE0' : 'rgba(255,255,255,.30)' }}>
+                {isDnf ? 'DNF' : played ? ordinal(sc!.rank!) : '—'}
               </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, textAlign: 'center', color: played ? '#F5EFE0' : 'rgba(255,255,255,.30)' }}>
+                {played ? sc!.strokes : '—'}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, textAlign: 'center', color: played ? diffColor : 'rgba(255,255,255,.30)' }}>
+                {played && sc!.net_diff != null ? (sc!.net_diff > 0 ? `+${sc!.net_diff}` : String(sc!.net_diff)) : '—'}
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, textAlign: 'center', color: played ? 'var(--trophy-gold)' : 'rgba(255,255,255,.30)' }}>
+                {played ? formatPts(Number(sc!.points_earned)) : '—'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Career section */}
+      <div style={{ padding: '14px' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#F5EFE0', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,.12)' }}>
+          Career
+        </div>
+        {careerScores === null ? (
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.30)' }}>Loading…</div>
+        ) : careerRanks.length === 0 ? (
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,.30)' }}>First season — no prior data</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            {[
+              { label: 'Career Wins',   value: String(careerWins),    gold: careerWins > 0 },
+              { label: 'Career Best',   value: careerBest != null ? ordinal(careerBest) : '—', gold: careerBest === 1 },
+              { label: 'Career Avg',    value: careerAvgFinish != null ? ordinal(Math.round(careerAvgFinish)) : '—', gold: false },
+            ].map(({ label, value, gold }) => (
+              <div key={label} style={{
+                padding: '8px 10px',
+                background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.09)',
+                borderRadius: 8,
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.40)', marginBottom: 3 }}>
+                  {label}
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: gold ? 'var(--trophy-gold)' : '#F5EFE0', lineHeight: 1 }}>
+                  {value}
+                </div>
+              </div>
             ))}
           </div>
-          {allRounds.map((r, i) => {
-            const sc = allScores.find(s => s.round_id === r.id && s.player_id === player.id)
-            const played = sc && sc.strokes != null
-            const isDnf  = sc?.dnf === true
-            const d = new Date(r.date + 'T12:00:00')
-            const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-            const diffColor = sc?.net_diff == null ? 'rgba(255,255,255,.30)'
-              : sc.net_diff < 0 ? 'var(--tournament-red)' : '#F5EFE0'
-
-            return (
-              <div key={r.id} className="grid grid-cols-[1fr_56px_56px_60px_56px] md:grid-cols-[1fr_68px_68px_72px_68px]" style={{
-                alignItems: 'center', padding: '9px 0',
-                borderBottom: i < allRounds.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none',
-                opacity: played || isDnf ? 1 : 0.38,
-              }}>
-                <div>
-                  <span style={{ fontSize: 14, color: '#F5EFE0', fontWeight: 500 }}>{dateStr}</span>
-                  {r.double_points && <span style={{ marginLeft: 4, fontSize: 10, color: 'var(--trophy-gold)' }}>⚡</span>}
-                  {r.notes && <div style={{ fontSize: 11, color: 'rgba(255,255,255,.40)', marginTop: 2 }}>{r.notes}</div>}
-                </div>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, textAlign: 'center',
-                  color: isDnf ? 'var(--tournament-red)' : played ? '#F5EFE0' : 'rgba(255,255,255,.30)' }}>
-                  {isDnf ? 'DNF' : played ? ordinal(sc!.rank!) : '—'}
-                </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, textAlign: 'center', color: played ? '#F5EFE0' : 'rgba(255,255,255,.30)' }}>
-                  {played ? sc!.strokes : '—'}
-                </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, textAlign: 'center', color: played ? diffColor : 'rgba(255,255,255,.30)' }}>
-                  {played && sc!.net_diff != null ? (sc!.net_diff > 0 ? `+${sc!.net_diff}` : String(sc!.net_diff)) : '—'}
-                </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, textAlign: 'center', color: played ? 'var(--trophy-gold)' : 'rgba(255,255,255,.30)' }}>
-                  {played ? formatPts(Number(sc!.points_earned)) : '—'}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Career: col1 row2 on desktop — last in DOM so it appears last on mobile */}
-        <div className="lg:col-start-1 lg:row-start-2" style={{ padding: '16px' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.10em', textTransform: 'uppercase', color: '#F5EFE0', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,.12)' }}>
-            Career
-          </div>
-          {careerScores === null ? (
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.30)' }}>Loading…</div>
-          ) : careerRanks.length === 0 ? (
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.30)' }}>First season — no prior data</div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[
-                { label: 'Career Wins', value: String(careerWins),    gold: careerWins > 0 },
-                { label: 'Career Best', value: careerBest != null ? ordinal(careerBest) : '—', gold: careerBest === 1 },
-                { label: 'Career Avg',  value: careerAvgFinish != null ? ordinal(Math.round(careerAvgFinish)) : '—', gold: false },
-              ].map(({ label, value, gold }) => (
-                <div key={label} style={{
-                  padding: '10px 12px',
-                  background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.09)',
-                  borderRadius: 8,
-                }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.40)', marginBottom: 4 }}>
-                    {label}
-                  </div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: gold ? 'var(--trophy-gold)' : '#F5EFE0', lineHeight: 1 }}>
-                    {value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
+        )}
       </div>
 
     </div>
