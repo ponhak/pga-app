@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useRouter } from 'next/navigation'
-import { ShieldCheck, Users, Database, CalendarDays, ChevronRight, UserCog } from 'lucide-react'
+import { ShieldCheck, Users, Database, CalendarDays, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 
 interface AdminCard {
@@ -15,8 +15,7 @@ interface AdminCard {
 
 const CARDS: AdminCard[] = [
   { href: '/admin/members',  Icon: ShieldCheck,  label: 'Approved Members',    desc: 'Control who can sign up and access the app' },
-  { href: '/admin/users',    Icon: UserCog,      label: 'User Roles',          desc: 'Grant or revoke admin rights for members' },
-  { href: '/players',        Icon: Users,         label: 'Field',               desc: 'Add or remove players from the roster' },
+  { href: '/admin/field',    Icon: Users,         label: 'Field & Roles',       desc: 'Manage the player roster and admin rights' },
   { href: '/admin/data',     Icon: Database,      label: 'Manage Data',         desc: 'Add historical rounds and correct results' },
   { href: '/admin/planning', Icon: CalendarDays,  label: 'Seasonal Planning',   desc: 'Plan and configure the upcoming season' },
 ]
