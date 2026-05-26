@@ -82,7 +82,7 @@ export function Sidebar() {
                 alignItems: 'center',
                 gap: 12,
                 padding: '11px 16px',
-                margin: '2px 8px',
+                margin: '2px 12px',
                 borderRadius: 8,
                 textDecoration: 'none',
                 color: on ? 'var(--trophy-gold)' : '#B9C5D9',
@@ -130,11 +130,11 @@ export function Sidebar() {
                 Admin
               </button>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '10px 16px 10px 9px', margin: '2px 8px', borderRadius: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 1, padding: '10px 16px 10px 5px', margin: '2px 12px', borderRadius: 8 }}>
               <PlayerAvatar
                 name={player?.name ?? firstName}
                 avatarUrl={player?.avatar_url ?? null}
-                size={30}
+                size={38}
               />
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#B9C5D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1 }}>
                 {(player?.name ?? firstName).split(' ')[0] || session.user.email}
@@ -162,7 +162,7 @@ function sidebarAction(danger = false): React.CSSProperties {
     alignItems: 'center',
     gap: 12,
     padding: '10px 16px',
-    margin: '2px 8px',
+    margin: '2px 12px',
     borderRadius: 8,
     background: 'transparent',
     border: 0,
