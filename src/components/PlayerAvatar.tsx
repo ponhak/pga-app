@@ -20,8 +20,7 @@ export function PlayerAvatar({
         style={{
           width: size, height: size, borderRadius: '50%', flexShrink: 0,
           objectFit: 'cover', objectPosition: 'top center',
-          background: 'var(--trophy-gold)',
-          outline: '2px solid var(--trophy-gold)',
+          outline: gold ? '2px solid var(--trophy-gold)' : 'none',
           outlineOffset: 1,
         }}
       />
@@ -31,8 +30,8 @@ export function PlayerAvatar({
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: 'var(--trophy-gold)',
-      color: 'var(--tour-navy)',
+      background: 'var(--fairway-green)',
+      color: '#F5EFE0',
       fontFamily: 'var(--font-display)', fontWeight: 700,
       fontSize: size * 0.42, letterSpacing: '.04em',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
