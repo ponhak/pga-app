@@ -136,7 +136,7 @@ export function Sidebar() {
                 avatarUrl={player?.avatar_url ?? null}
                 size={38}
               />
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#B9C5D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--trophy-gold)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1 }}>
                 {(player?.name ?? firstName).split(' ')[0] || session.user.email}
               </div>
             </div>
