@@ -204,7 +204,8 @@
 }
 
 /* ---- Prevent horizontal overflow without breaking position:sticky ---- */
-html { overflow-x: clip; }
+/* clip (unlike hidden) does not create a scroll container, so sticky works */
+html, body { overflow-x: clip; }
 
 /* ---- Hero card: clip sides+bottom on phones, only bottom on larger screens ---- */
 .hero-card-clip {
