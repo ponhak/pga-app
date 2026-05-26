@@ -130,11 +130,11 @@ export function Sidebar() {
                 Admin
               </button>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 1, padding: '10px 16px 10px 5px', margin: '2px 12px', borderRadius: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '10px 16px 10px 8px', margin: '2px 12px', borderRadius: 8 }}>
               <PlayerAvatar
                 name={player?.name ?? firstName}
                 avatarUrl={player?.avatar_url ?? null}
-                size={38}
+                size={32}
               />
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--trophy-gold)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1, alignSelf: 'center' }}>
                 {(player?.name ?? firstName).split(' ')[0] || session.user.email}
