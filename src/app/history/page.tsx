@@ -504,7 +504,7 @@ export default function HistoryPage() {
                 </div>
 
                 {/* Hero card */}
-                <div style={{ position: 'relative', height: 280, background: 'var(--tour-navy)' }}>
+                <div className="hero-card-clip" style={{ position: 'relative', height: 280, background: 'var(--tour-navy)' }}>
                   {/* Owl torso */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img

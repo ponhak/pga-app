@@ -433,7 +433,7 @@ export default function DashboardPage() {
         {/* Leader hero card */}
         {leader && hasData && (
           <>
-            <div style={{ position: 'relative', height: 280, background: 'var(--tour-navy)' }}>
+            <div className="hero-card-clip" style={{ position: 'relative', height: 280, background: 'var(--tour-navy)' }}>
 
               {/* Owl torso — not clipped, bleeds outside card on desktop */}
               {/* eslint-disable-next-line @next/next/no-img-element */}

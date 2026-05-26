@@ -203,6 +203,16 @@
   }
 }
 
+/* ---- Hero card: clip sides+bottom, allow bleed upward ---- */
+.hero-card-clip {
+  clip-path: inset(-300px 0 0 0);
+}
+@media (min-width: 768px) {
+  .hero-card-clip {
+    clip-path: inset(-300px 0 0 -300px);
+  }
+}
+
 /* ---- Main content bottom padding (accounts for mobile tab bar) ---- */
 .main-content-pad {
   padding-bottom: max(80px, calc(64px + env(safe-area-inset-bottom, 0px)));
