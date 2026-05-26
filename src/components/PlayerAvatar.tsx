@@ -20,6 +20,7 @@ export function PlayerAvatar({
         style={{
           width: size, height: size, borderRadius: '50%', flexShrink: 0,
           objectFit: 'cover', objectPosition: 'top center',
+          background: 'var(--fairway-green)',
           outline: gold ? '2px solid var(--trophy-gold)' : 'none',
           outlineOffset: 1,
         }}
