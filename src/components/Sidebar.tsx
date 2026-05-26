@@ -114,7 +114,7 @@ export function Sidebar() {
       </nav>
 
       {/* User section */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', padding: '12px 8px' }}>
+      <div style={{ borderTop: '1px solid rgba(255,255,255,.08)', padding: '8px 0' }}>
         {session ? (
           <>
             {isAdmin && (
@@ -130,7 +130,7 @@ export function Sidebar() {
                 Admin
               </button>
             )}
-            <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px 8px', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', margin: '2px 8px', borderRadius: 8 }}>
               <PlayerAvatar
                 name={player?.name ?? firstName}
                 avatarUrl={player?.avatar_url ?? null}
@@ -158,11 +158,11 @@ export function Sidebar() {
 
 function sidebarAction(danger = false): React.CSSProperties {
   return {
-    width: '100%',
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    padding: '10px 12px',
+    gap: 12,
+    padding: '10px 16px',
+    margin: '2px 8px',
     borderRadius: 8,
     background: 'transparent',
     border: 0,
