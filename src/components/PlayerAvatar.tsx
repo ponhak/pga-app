@@ -30,8 +30,8 @@ export function PlayerAvatar({
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: gold ? 'var(--trophy-gold)' : 'var(--tour-navy)',
-      color: gold ? 'var(--tour-navy)' : '#F5EFE0',
+      background: 'var(--trophy-gold)',
+      color: 'var(--tour-navy)',
       fontFamily: 'var(--font-display)', fontWeight: 700,
       fontSize: size * 0.42, letterSpacing: '.04em',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
