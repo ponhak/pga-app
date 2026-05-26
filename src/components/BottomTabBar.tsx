@@ -11,7 +11,7 @@ const BASE_TABS = [
   { id: 'history',  href: '/history',  label: 'History',  Icon: Trophy },
 ]
 
-const PLANNING_TAB = { id: 'planning', href: '/planning', label: 'Avail', Icon: CalendarRange }
+const PLANNING_TAB = { id: 'planning', href: '/planning', label: 'Availability', Icon: CalendarRange }
 
 export function BottomTabBar() {
   const pathname = usePathname()
@@ -56,9 +56,9 @@ export function BottomTabBar() {
               gap: 3,
               height: 64,
               color: on ? 'var(--trophy-gold)' : '#B9C5D9',
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: 700,
-              letterSpacing: '.10em',
+              letterSpacing: '.04em',
               textTransform: 'uppercase',
               textDecoration: 'none',
               position: 'relative',
