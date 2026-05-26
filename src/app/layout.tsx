@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${oswald.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background" style={{ fontFamily: 'var(--font-body)', overflowX: 'hidden' }}>
+      <body className="min-h-full flex flex-col bg-background" style={{ fontFamily: 'var(--font-body)' }}>
         <AuthProvider>
           <Sidebar />
           <div className="flex flex-col flex-1 md:ml-[220px]">

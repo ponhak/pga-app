@@ -203,13 +203,16 @@
   }
 }
 
-/* ---- Hero card: clip sides+bottom, allow bleed upward ---- */
+/* ---- Prevent horizontal overflow without breaking position:sticky ---- */
+html { overflow-x: clip; }
+
+/* ---- Hero card: clip sides+bottom on phones, only bottom on larger screens ---- */
 .hero-card-clip {
-  clip-path: inset(-300px 0 0 0);
+  clip-path: inset(-300px -300px 0 -300px);
 }
-@media (min-width: 768px) {
+@media (max-width: 520px) {
   .hero-card-clip {
-    clip-path: inset(-300px 0 0 -300px);
+    clip-path: inset(-300px 0 0 0);
   }
 }
 
