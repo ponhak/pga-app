@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { UserCircle, LogIn, LogOut, ShieldCheck } from 'lucide-react'
+import { LogIn, LogOut, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
 
 export function NavBar() {
   const pathname = usePathname()
@@ -13,6 +14,14 @@ export function NavBar() {
   const isHome = pathname === '/'
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [player, setPlayer] = useState<{ name: string; avatar_url: string | null } | null>(null)
+
+  useEffect(() => {
+    if (!session?.user.email) { setPlayer(null); return }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(supabase as any).from('players').select('name, avatar_url').eq('account_email', session.user.email).maybeSingle()
+      .then(({ data }: { data: { name: string; avatar_url: string | null } | null }) => setPlayer(data ?? null))
+  }, [session?.user.email])
 
   useEffect(() => {
     if (!isHome) return
@@ -149,8 +158,8 @@ export function NavBar() {
             aria-label={session ? 'Account menu' : 'Sign in'}
             onClick={() => session ? setMenuOpen(v => !v) : router.push('/login')}
             style={{
-              width: 44,
-              height: 44,
+              width: 52,
+              height: 52,
               background: 'transparent',
               border: 0,
               color: '#F5EFE0',
@@ -159,15 +168,19 @@ export function NavBar() {
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 1,
+              gap: 0,
               padding: 0,
             }}
           >
             {session ? (
               <>
-                <UserCircle size={20} strokeWidth={2} />
-                <span style={{ fontSize: 9, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--trophy-gold)', lineHeight: 1 }}>
-                  {firstName.slice(0, 8)}
+                <PlayerAvatar
+                  name={player?.name ?? firstName}
+                  avatarUrl={player?.avatar_url ?? null}
+                  size={28}
+                />
+                <span style={{ fontSize: 9, letterSpacing: '.04em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--trophy-gold)', lineHeight: 1, marginTop: 3 }}>
+                  {(player?.name ?? firstName).split(' ')[0].slice(0, 8)}
                 </span>
               </>
             ) : (
