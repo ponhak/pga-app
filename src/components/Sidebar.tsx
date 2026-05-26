@@ -6,6 +6,7 @@ import { Home, CalendarDays, Trophy, CalendarRange, LogIn, LogOut, ShieldCheck }
 import { useAuth } from '@/components/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { PlayerAvatar } from '@/components/PlayerAvatar'
+import { useEffect, useState } from 'react'
 
 const BASE_TABS = [
   { id: 'home',     href: '/',         label: 'Home',         Icon: Home },
@@ -34,6 +35,15 @@ export function Sidebar() {
   const firstName = session?.user.user_metadata?.name?.split(' ')[0]
     ?? session?.user.email?.split('@')[0]
     ?? ''
+
+  const [player, setPlayer] = useState<{ name: string; avatar_url: string | null } | null>(null)
+
+  useEffect(() => {
+    if (!session?.user.email) { setPlayer(null); return }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(supabase as any).from('players').select('name, avatar_url').eq('account_email', session.user.email).maybeSingle()
+      .then(({ data }: { data: { name: string; avatar_url: string | null } | null }) => setPlayer(data ?? null))
+  }, [session?.user.email])
 
   return (
     <aside
@@ -120,14 +130,14 @@ export function Sidebar() {
                 Admin
               </button>
             )}
-            <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, boxSizing: 'border-box' }}>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '12px 12px 8px', boxSizing: 'border-box' }}>
               <PlayerAvatar
-                name={session.user.user_metadata?.name ?? session.user.email ?? '?'}
-                avatarUrl={session.user.user_metadata?.avatar_url}
-                size={22}
+                name={player?.name ?? firstName}
+                avatarUrl={player?.avatar_url ?? null}
+                size={48}
               />
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#B9C5D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {firstName || session.user.email}
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#B9C5D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                {(player?.name ?? firstName).split(' ')[0] || session.user.email}
               </div>
             </div>
             <button onClick={handleLogout} style={sidebarAction(true)}>
